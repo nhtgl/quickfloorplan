@@ -73,3 +73,30 @@ export function openingSpan(p: Project, id: OpeningId): [number, number] {
 export function wallForOpening(p: Project, id: OpeningId) {
   return wallById(p, openingById(p, id).wallId);
 }
+
+/**
+ * Where along a wall its label can sit and still be read. The label is drawn in reverse
+ * out of the wall's own fill, so putting it over an opening — which is a gap, not fill —
+ * makes it disappear. This returns the middle of the widest stretch of solid wall.
+ */
+export function labelOffsetAlongWall(p: Project, wallId: string): number {
+  const len = wallLength(p, wallId);
+  const spans = p.openings
+    .filter((o) => o.wallId === wallId)
+    .map((o) => openingSpan(p, o.id))
+    .sort((a, b) => a[0] - b[0]);
+
+  let best: [number, number] = [0, len];
+  let bestWidth = -1;
+  let cursor = 0;
+  for (const [start, end] of [...spans, [len, len] as [number, number]]) {
+    const gap = Math.min(start, len) - cursor;
+    if (gap > bestWidth) {
+      bestWidth = gap;
+      best = [cursor, Math.min(start, len)];
+    }
+    cursor = Math.max(cursor, Math.min(end, len));
+  }
+  if (bestWidth <= 0) return len / 2;
+  return (best[0] + best[1]) / 2;
+}

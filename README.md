@@ -1,0 +1,87 @@
+# QuickFloorPlan
+
+Sketch the walls of a flat, type in the measurements you took with a tape, mark the doors
+and windows, outline the rooms, and export a PDF you can hand to a builder, architect, or
+kitchen fitter.
+
+It is a communication document, not a construction drawing. It says "this is roughly the
+shape of the space and here are the numbers I measured." A professional takes it from there.
+
+```
+npm install
+npm run dev      # http://localhost:5173
+npm test         # unit and component tests
+npm run verify   # builds, then drives the real app in Chrome and checks the PDF
+```
+
+## Using it
+
+Pick the **Wall** tool and click corner to corner. Lengths snap to 15° increments and to
+existing corners; hold **Alt** to draw at a free angle. Click the first corner to close a
+loop, or press **Enter** to finish an open run.
+
+Select any wall to type its exact length, its angle to the previous wall, its thickness, and
+a height override. **Door**, **Window** and **Opening** place a fitting on the wall you
+click, which you then correct by typing numbers. **Room** outlines an area.
+
+Keys: `V` select, `W` wall, `D` door, `N` window, `P` opening, `R` room, `F` fit to view,
+`Cmd/Ctrl+Z` undo. Wheel zooms, shift-drag or middle-drag pans.
+
+Projects are `.floorplan.json` files on your disk. The app also autosaves to the browser so
+a refresh never loses work, but the file is the thing you own and share.
+
+## Three decisions worth knowing about
+
+**Rooms are free polygons, not derived from the walls.** A dining area and a hall often
+share the same four walls with nothing but an imaginary line between them. Rooms snap to
+wall faces while you draw, so the common case is quick, but nothing forces them to follow
+walls. An edge with no wall behind it draws dashed on the plan, so nobody quotes for a
+partition that was never there.
+
+**Typing a measurement can open a closed loop, and the tool shows you.** Changing a wall's
+length moves everything downstream of it. Go all the way round a closed loop and the shape
+no longer meets itself. Rather than quietly stretching the last wall to absorb the error,
+the corner comes apart by exactly the amount your edit demanded and the plan badges it as
+"open by 0.80 m" until you fix it. Drag the loose end back onto its partner, or adjust
+another wall.
+
+**Warnings never block.** An opening wider than its wall, two openings overlapping, rooms
+that double-count area: all of these are flagged and none of them stop you saving or
+exporting. Numbers taken off a tape are inconsistent halfway through, and a tool that
+refuses to save until everything is perfect is a tool people abandon.
+
+## The PDF
+
+Page 1 is the plan: every wall dimensioned and lettered, rooms tinted with names and areas,
+door swings drawn. Then one page per wall, titled with the rooms it faces ("Wall C — Kitchen
+/ Hall"), showing that wall face on with each opening dimensioned — position along the wall,
+width, height, and sill height where there is one.
+
+Pages are scaled to fit, not drawn at 1:50, so the footer says so. Read the numbers, don't
+measure the printout.
+
+## Layout
+
+| Path | What lives there |
+|---|---|
+| `src/model/` | Pure geometry and rules. No React, no DOM. Where the real tests are. |
+| `src/state/` | Store, undo history, autosave |
+| `src/render/` | The SVG components, used by both the screen and the PDF |
+| `src/ui/` | Canvas, tools, panels |
+| `src/export/` | PDF assembly |
+| `src/file/` | Save, open, validate |
+
+The screen and the PDF share one set of SVG components. To export, those components are
+mounted into an offscreen DOM node and the resulting `<svg>` is handed to svg2pdf. There is
+no second drawing implementation to drift out of sync with what you approved on screen.
+
+## Testing
+
+`npm test` covers the geometry, the room maths, validation, the store, the renderers and the
+main drawing flows.
+
+It does **not** cover PDF export. jsdom implements no SVG layout — no `getBBox`, no
+`SVGTextElement.x.baseVal` — so svg2pdf reads null coordinates there and every text run
+fails. Stubbing that would only test the stubs. `npm run verify` builds the app, drives it in
+Chrome, exports a real PDF and checks the pages that come out. Run it before trusting a
+change to anything under `src/render/` or `src/export/`.

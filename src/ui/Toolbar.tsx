@@ -1,0 +1,112 @@
+import { useState } from "react";
+import { emptyProject } from "../model/factory";
+import { mmToM, mToMm } from "../model/units";
+import { openProject, saveProject } from "../file/io";
+import { exportPdf, pdfFileName } from "../export/pdf";
+import { useStore, type Tool } from "../state/store";
+
+const TOOLS: { id: Tool; label: string; hint: string }[] = [
+  { id: "select", label: "Select", hint: "Pick and edit (V)" },
+  { id: "wall", label: "Wall", hint: "Click corner to corner (W)" },
+  { id: "door", label: "Door", hint: "Click a wall (D)" },
+  { id: "window", label: "Window", hint: "Click a wall (N)" },
+  { id: "passage", label: "Opening", hint: "Archway or hatch (P)" },
+  { id: "room", label: "Room", hint: "Outline an area (R)" },
+];
+
+export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) => void }) {
+  const tool = useStore((s) => s.tool);
+  const setTool = useStore((s) => s.setTool);
+  const project = useStore((s) => s.project);
+  const apply = useStore((s) => s.apply);
+  const reset = useStore((s) => s.reset);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  const [busy, setBusy] = useState(false);
+
+  async function doExport() {
+    setBusy(true);
+    try {
+      const blob = await exportPdf(project);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = pdfFileName(project);
+      a.click();
+      URL.revokeObjectURL(url);
+      onNotify(`Exported ${1 + project.walls.length} pages.`);
+    } catch (err) {
+      onNotify(`Could not export: ${(err as Error).message}`, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doOpen() {
+    const result = await openProject();
+    if (!result) return;
+    if (result.ok) {
+      reset(result.project);
+      onNotify(`Opened ${result.project.name}.`);
+    } else {
+      onNotify(result.error, true);
+    }
+  }
+
+  return (
+    <header className="toolbar">
+      <div className="brand">QuickFloorPlan</div>
+
+      <div className="tools">
+        {TOOLS.map((t) => (
+          <button
+            key={t.id}
+            className={tool === t.id ? "tool on" : "tool"}
+            onClick={() => setTool(t.id)}
+            title={t.hint}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="spacer" />
+
+      <label className="field inline">
+        <span>Name</span>
+        <input
+          aria-label="Project name"
+          defaultValue={project.name}
+          key={project.name}
+          onBlur={(e) => apply((p) => ({ ...p, name: e.currentTarget.value }))}
+        />
+      </label>
+
+      <label className="field inline">
+        <span>Ceiling</span>
+        <input
+          type="number"
+          aria-label="Ceiling height"
+          step={0.01}
+          defaultValue={mmToM(project.defaultWallHeight)}
+          key={project.defaultWallHeight}
+          onBlur={(e) =>
+            apply((p) => ({ ...p, defaultWallHeight: mToMm(Number(e.currentTarget.value)) }))
+          }
+        />
+        <em>m</em>
+      </label>
+
+      <div className="actions">
+        <button onClick={undo} title="Undo (Cmd/Ctrl+Z)">Undo</button>
+        <button onClick={redo} title="Redo (Shift+Cmd/Ctrl+Z)">Redo</button>
+        <button onClick={() => reset(emptyProject("Untitled"))}>New</button>
+        <button onClick={doOpen}>Open</button>
+        <button onClick={() => saveProject(project).catch(() => undefined)}>Save</button>
+        <button className="primary" onClick={doExport} disabled={busy}>
+          {busy ? "Exporting…" : "Export PDF"}
+        </button>
+      </div>
+    </header>
+  );
+}

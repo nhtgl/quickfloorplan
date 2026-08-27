@@ -136,3 +136,25 @@ export function wallsForRoom(p: Project, roomId: RoomId): WallId[] {
   if (!room) return [];
   return p.walls.filter((w) => wallBordersRoom(p, w.id, room)).map((w) => w.id);
 }
+
+/**
+ * Whether a room edge has a wall behind it. Edges without one are notional boundaries —
+ * the imaginary line between a dining area and a hall — and the plan draws them dashed
+ * so nobody quotes for a partition that was never there.
+ */
+export function edgeHasWallBehind(p: Project, a: Point, b: Point): boolean {
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len === 0) return false;
+  for (const wall of p.walls) {
+    const ends = wallEnds(p, wall.id);
+    const tolerance = wall.thickness / 2 + ROOM_MATCH_SLACK_MM;
+    let hits = 0;
+    for (let i = 0; i < SAMPLES; i += 1) {
+      const t = i / (SAMPLES - 1);
+      const pt = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      if (distanceToSegment(pt, ends.a, ends.b) <= tolerance) hits += 1;
+    }
+    if (hits / SAMPLES >= 0.9) return true;
+  }
+  return false;
+}

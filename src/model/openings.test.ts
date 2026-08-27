@@ -141,3 +141,30 @@ describe("projectWarnings", () => {
     expect(projectWarnings(p).map((w) => w.kind)).toContain("room-degenerate");
   });
 });
+
+describe("labelOffsetAlongWall", () => {
+  it("centres the label on a bare wall", async () => {
+    const { labelOffsetAlongWall } = await import("./openings");
+    const p = wallProject();
+    expect(labelOffsetAlongWall(p, p.walls[0].id)).toBe(2100);
+  });
+
+  it("keeps the label off an opening that straddles the midpoint", async () => {
+    const { labelOffsetAlongWall } = await import("./openings");
+    const p = wallProject();
+    const { project } = withOpening(p, { offset: 2100, width: 1200 });
+    const wallId = project.walls[0].id;
+    const at = labelOffsetAlongWall(project, wallId);
+    // The opening spans 1500..2700, so the label must sit outside that.
+    expect(at < 1500 || at > 2700).toBe(true);
+  });
+
+  it("picks the widest stretch of solid wall", async () => {
+    const { labelOffsetAlongWall } = await import("./openings");
+    let p = wallProject();
+    // Leaves solid runs of 0..500, 1500..2500 and 3500..4200; the middle one is widest.
+    p = withOpening(p, { offset: 1000, width: 1000 }).project;
+    p = withOpening(p, { offset: 3000, width: 1000 }).project;
+    expect(labelOffsetAlongWall(p, p.walls[0].id)).toBe(2000);
+  });
+});
