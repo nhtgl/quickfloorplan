@@ -6,8 +6,8 @@
 ## Purpose
 
 A drawing tool for people who are not designers. You draw the walls of a flat, type in the
-measurements, mark where the doors and windows are, and export a PDF you can hand to a
-builder, architect, or kitchen fitter.
+measurements, mark where the doors and windows are, outline the rooms, and export a PDF you
+can hand to a builder, architect, or kitchen fitter.
 
 The output is a communication document, not a construction drawing. It says "this is roughly
 the shape of the space and here are the numbers I measured." A professional takes it from there.
@@ -18,7 +18,8 @@ Deliberately excluded, to keep the tool small:
 
 - Multiple floors or levels
 - Furniture, fixtures, appliances
-- Room names, areas, or room-level anything
+- Room-level anything beyond name, shape and area (no finishes, no schedules of
+  materials, no cost)
 - Stairs, roofs, terrain
 - 3D of any kind
 - Cloud storage, accounts, collaboration
@@ -77,6 +78,7 @@ type ProjectFile = {
   nodes: Node[]
   walls: Wall[]
   openings: Opening[]
+  rooms: Room[]
   createdAt: string              // ISO 8601
   updatedAt: string              // ISO 8601
 }
@@ -103,11 +105,26 @@ type Opening = {
   offset: number                 // mm from wall.a along the wall centreline, to opening CENTRE
   width: number                  // mm
   height: number                 // mm
-  sill: number                   // mm above floor; 0 for doors and passages
+  sill: number                   // mm above floor; 0 for doors, may be > 0 for passages
   hinge?: "a" | "b"              // doors only: which wall end the hinge is at
   swing?: "in" | "out"           // doors only: which side of the wall the leaf swings to
 }
+
+type Room = {
+  id: string
+  name: string                   // "Kitchen", "Dining", "Hall"
+  polygon: { x: number, y: number }[]   // mm, plan coords, closed implicitly, CCW or CW
+  tint: string                   // hex, from a light palette; user-changeable
+}
 ```
+
+### Opening kinds
+
+`door` carries a hinge side and a swing direction and is drawn in plan with the usual
+quarter-arc. `window` carries a sill height above the floor. `passage` is an opening with no
+door in it — a cased opening, an archway, or a serving hatch — and is drawn in plan as a plain
+break in the wall with no arc. A passage may have a sill above zero, which is what makes a
+serving hatch between two rooms expressible rather than a special case.
 
 ### Wall labels
 
@@ -149,11 +166,53 @@ the user the truth is both simpler and more honest than guessing which wall they
 future consumer agree. The UI labels it with a visual toggle showing the arc, not the words
 "in" and "out", because those are meaningless without a reference frame.
 
+## Rooms
+
+A room is a free polygon, drawn point-to-point, that is **not** derived from the walls. This is
+the central decision and it is deliberate: in a real flat the boundary between a dining area and
+a hall is often imaginary, and the two share the same four walls. Deriving rooms from wall
+enclosures cannot express that. It would also be fragile — closed loops are allowed to have a
+gap (see above), and a region-finding algorithm falls apart on a chain that does not quite meet.
+
+Room polygons snap to wall faces and wall corners while being drawn, so the common case of "this
+room is the whole enclosure" is a few clicks and lands exactly on the walls. Nothing forces them
+to. Two rooms may share an edge that has no wall behind it, which is exactly how dining and hall
+are distinguished.
+
+**Area** is computed from the polygon with the shoelace formula and displayed in m² to one
+decimal place. It is always derived, never stored or typed — a stored area could disagree with
+the shape.
+
+**Overlap is allowed but flagged.** Overlapping polygons double-count area, which is usually a
+mistake, so overlapping rooms get a warning badge. Consistent with everything else in this tool,
+it does not block saving or exporting.
+
+**Tints** come from a fixed light palette, auto-assigned on creation and changeable. The palette
+is constrained to tints light enough that black dimension text stays readable over them,
+including when the PDF is printed on a greyscale printer — a plan whose numbers vanish under a
+fill is worse than one with no colour at all.
+
+### Which room does a wall belong to?
+
+Elevation pages are titled with the room a wall faces, so this association has to be computed.
+It is **derived, not stored**: a stored link would go stale the moment either the wall or the
+room polygon moves.
+
+A wall is associated with a room when at least 25% of the wall's centreline lies within
+`wall.thickness / 2 + 150 mm` of the room polygon's boundary. The thickness term is there
+because a snapped room edge runs along the wall's inner face, half a thickness off the
+centreline; the 150 mm is slack for edges the user placed by eye. The 25% threshold stops a wall
+that merely clips a room's corner from being tagged with it.
+
+A wall may match several rooms — one on each side, or several along its length in an open plan —
+and the elevation page lists all of them, e.g. "Wall C→D — Kitchen / Hall". A wall matching no
+room is titled without a suffix.
+
 ## Modules
 
 | Path | Responsibility | Depends on |
 |---|---|---|
-| `src/model/` | Types and pure geometry: wall length, corner angle, length/angle edits, loop gap, opening → elevation coordinate mapping, validation. No React, no DOM. | nothing |
+| `src/model/` | Types and pure geometry: wall length, corner angle, length/angle edits, loop gap, opening → elevation coordinate mapping, room area, room–wall association, polygon overlap, validation. No React, no DOM. | nothing |
 | `src/state/` | Zustand store, undo/redo snapshot stack, localStorage autosave | `model` |
 | `src/render/dimensions.ts` | Shared dimension-line primitives (extension lines, arrowheads, label placement) | `model` |
 | `src/render/plan.tsx` | Top-down SVG: walls as thick strokes, door arcs, window symbols, dimension lines, node labels | `model`, `dimensions` |
@@ -178,6 +237,10 @@ thickness, and height override. Clicking a node drags it. Clicking an opening sh
 **Door / window / passage tools.** Click a wall; the opening is placed where clicked, then the
 user types exact numbers.
 
+**Room tool.** Click point to point to outline a room, snapping to wall faces and wall corners.
+Enter, Escape, or clicking the first point closes the polygon. The panel then takes a name and a
+tint, and shows the computed area. Room vertices are draggable afterwards with the select tool.
+
 **Navigation.** Space-drag or middle-drag to pan, wheel to zoom, `F` to fit the plan to the
 viewport, `Cmd/Ctrl+Z` and `Shift+Cmd/Ctrl+Z` for undo and redo.
 
@@ -189,11 +252,17 @@ enough that snapshotting is cheaper to build and to reason about than a command 
 A4 landscape throughout.
 
 **Page 1 — top-down plan.** All wall lengths and corner angles dimensioned, walls labelled with
-their stable letters, door swings drawn as quarter-arcs, windows as their standard symbol.
+their stable letters, door swings drawn as quarter-arcs, windows as their standard symbol,
+passages as plain breaks. Each room is filled with its tint and labelled with its name and
+computed area (e.g. "Dining — 11.8 m²"). Where two rooms share an edge with no wall behind it,
+that edge is drawn as a dashed line so the reader can see it is a notional boundary, not a
+partition to build.
 
-**Pages 2..n — one per wall, in label order.** Titled "Wall A→B". Shows the wall face as a
-rectangle at its length and height, with each opening drawn in place and dimensioned: distance
-along the wall, width, height, and sill height for windows.
+**Pages 2..n — one per wall, in label order.** Titled "Wall A→B — Kitchen", naming every room
+the wall is associated with (see room–wall association above), or just "Wall A→B" if none.
+Shows the wall face as a rectangle at its length and height, with each opening drawn in place
+and dimensioned: distance along the wall, width, height, and sill height for windows and for
+any passage with a sill.
 
 Every page is scaled to fit within margins. The footer carries the project name, the export
 date, "page x of y", and the text "Not to scale — all dimensions in metres."
@@ -212,8 +281,9 @@ failure the app shows a toast naming the actual problem and leaves the current p
 untouched. A corrupt file must never destroy work in progress.
 
 **Geometry warnings.** An opening wider than its wall, an opening extending past a wall end, two
-openings overlapping, or an open loop each produce a red highlight on the offending element and
-a message in the properties panel. None of these block saving or exporting. The user is
+openings overlapping, an open loop, a self-intersecting room polygon, a room polygon with fewer
+than three distinct vertices, or two rooms overlapping each produce a red highlight on the
+offending element and a message in the properties panel. None of these block saving or exporting. The user is
 sketching a real flat from tape measurements; the numbers will be inconsistent mid-edit, and a
 tool that refuses to save until everything is perfect is a tool people abandon. It nags; it
 never blocks.
@@ -229,11 +299,16 @@ The bulk of testing targets `src/model/`, with Vitest:
 - Length edits and angle edits: the downstream chain transforms rigidly, upstream is untouched
 - Loop gap: closed loops report zero, broken loops report the correct distance
 - Opening → elevation coordinate mapping in both directions
+- Room area by shoelace, including a concave polygon and both vertex winding directions
+- Room–wall association: a wall along a room edge matches, a wall clipping only its corner does
+  not, a wall between two rooms matches both
+- Room polygon self-intersection and room-versus-room overlap detection
 - Serialize / deserialize round-trip preserves the project exactly
 - Schema validation rejects malformed files with a useful message
 
-Two React Testing Library tests cover the primary flow: draw a four-wall closed rectangle, and
-place a door on a wall and edit its numbers.
+Three React Testing Library tests cover the primary flow: draw a four-wall closed rectangle,
+place a door on a wall and edit its numbers, and split that rectangle into two named rooms that
+share an edge with no wall behind it.
 
 PDF export is tested for page count and document structure — that a project with five walls
 produces six pages, and that each elevation page receives an SVG containing the expected
