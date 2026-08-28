@@ -70,7 +70,11 @@ export default function App() {
       <Toolbar onNotify={(msg, bad) => setToast({ msg, bad: Boolean(bad) })} />
       <main>
         <div className="stage" ref={stageRef}>
-          <Canvas width={size.width} height={size.height} />
+          <Canvas
+            width={size.width}
+            height={size.height}
+            onNotify={(msg) => setToast({ msg, bad: false })}
+          />
           <Warnings />
         </div>
         <Properties />

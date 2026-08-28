@@ -105,6 +105,14 @@ with a guide showing what it caught. Each axis settles separately, so a room alr
 against a wall slides along it instead of being yanked onto a corner. Snapping puts the wall
 centrelines together, which leaves exactly one wall of that thickness between the two rooms.
 
+When a room lands flush against another and the wall they now share has a door, a window or
+an opening in it, that opening is copied onto the arriving room's wall too, and the app says
+so. A door between two rooms is one door, but each room here carries its own walls, so it has
+to appear in both for either room's elevation page to be right. The hinge and the swing are
+flipped as it crosses, because the two walls run in opposite directions — so the copy is the
+same physical door rather than a mirror image of it. Undoing the move takes the door back
+with it.
+
 Zoom and fit buttons sit at the bottom right of the canvas. The **Pan** tool drags the view,
 and shift-drag or middle-drag pans with any tool selected.
 

@@ -201,7 +201,7 @@ await page.getByRole("button", { name: "Select" }).click();
 
 // Build a room by typing measurements, and look at the live preview.
 await page.getByRole("button", { name: "Room from sizes…" }).click();
-await page.getByTestId("measurements-input").fill("250,90,100,90,250,90,100,90");
+await page.getByTestId("measurements-input").fill("250,90,328,90,250,90,328,90");
 await page.waitForTimeout(150);
 const readout = await page.getByTestId("measurement-readout").textContent();
 await page.screenshot({ path: join(OUT, "measurements-dialog.png") });
@@ -264,6 +264,17 @@ const dragGuides = await page.locator('[data-testid="align-guide"]').count();
 await page.mouse.up();
 await page.waitForTimeout(150);
 const edgesAfter = await roomEdges();
+const openingsAfter = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
+  const shared = new Set(
+    raw.walls.filter((w) => ["E", "F", "G", "H"].includes(w.label)).map((w) => w.id),
+  );
+  return {
+    total: raw.openings.length,
+    onMovedRoom: raw.openings.filter((o) => shared.has(o.wallId)).length,
+  };
+});
+const doorToast = await page.locator('[role="status"]').textContent().catch(() => "");
 await page.screenshot({ path: join(OUT, "rooms-snapped.png") });
 
 const [download] = await Promise.all([
@@ -297,7 +308,7 @@ const checks = [
   ["an alignment guide appears when lining up with a corner", guideCount > 0],
   ["typed measurements close exactly", (readout ?? "").includes("Closes exactly")],
   ["creating adds four walls", wallsAfter - wallsBefore === 4],
-  ["typed room reports 2.5 m2 of floor", (typedRoomArea ?? "").includes("2.5 m²")],
+  ["typed room reports 8.2 m2 of floor", (typedRoomArea ?? "").includes("8.2 m²")],
   ["the new room is brought into view", typedRoomVisible],
   ["a photo imports and is listed", photoRows === 1],
   // 2400x1800 source, scaled to fit a 1400px box and re-encoded as JPEG.
@@ -305,6 +316,8 @@ const checks = [
   ["PDF gains a sketch page and a photo page", pages === 11],
   ["dragging a room shows a snap guide", dragGuides > 0],
   ["the dragged room lands flush against the other", edgesAfter.movingLeft === edgesAfter.stationaryRight],
+  ["the door in the shared wall reaches the arriving room", openingsAfter.onMovedRoom >= 1],
+  ["and it says so rather than doing it silently", (doorToast ?? "").toLowerCase().includes("shared wall")],
   ["no page or console errors", problems.length === 0],
 ];
 

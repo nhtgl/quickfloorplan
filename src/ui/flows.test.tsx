@@ -6,7 +6,8 @@ import { emptyProject } from "../model/factory";
 import { loopGap, wallLength } from "../model/geometry";
 import { wallMeasuredLength } from "../model/measure";
 import { addPhoto, makePhoto } from "../model/photos";
-import { loopNodeIds, moveLoop } from "../model/loops";
+import { loopNodeIds, loopWallIds, moveLoop } from "../model/loops";
+import { addOpeningAtOffset } from "../model/ops";
 import { pageTitles } from "../export/pageTitles";
 import { roomArea } from "../model/rooms";
 import { useStore } from "../state/store";
@@ -862,5 +863,105 @@ describe("dragging a room in many small steps", () => {
     const oneGo = before - Math.min(...xs("E"));
 
     expect(stepwise).toBe(oneGo);
+  });
+});
+
+describe("a door in a wall two rooms come to share", () => {
+  async function twoRoomsWithDoor() {
+    render(<App />);
+    for (const sizes of ["400,90,300,90,400,90,300,90", "250,90,300,90,250,90,300,90"]) {
+      await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+      await userEvent.type(screen.getByTestId("measurements-input"), sizes);
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    }
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+
+    // A door in the first room's right-hand wall, the one the other room will meet.
+    act(() =>
+      useStore.getState().apply((p) => {
+        const b = p.walls.find((w) => w.label === "B")!;
+        return addOpeningAtOffset(p, b.id, 1200, "door").project;
+      }),
+    );
+    return useStore.getState().project.openings[0];
+  }
+
+  /** Slide the second room until its left edge is a whisker from the first's right. */
+  function parkAlmostTouching(gap: number) {
+    act(() =>
+      useStore.getState().apply((p) => {
+        const movingIds = new Set(loopNodeIds(p, p.walls.find((w) => w.label === "E")!.id));
+        const movingLeft = Math.min(
+          ...p.nodes.filter((n) => movingIds.has(n.id)).map((n) => n.x),
+        );
+        const stationaryRight = Math.max(
+          ...p.nodes.filter((n) => !movingIds.has(n.id)).map((n) => n.x),
+        );
+        return moveLoop(
+          p,
+          p.walls.find((w) => w.label === "E")!.id,
+          stationaryRight + gap - movingLeft,
+          0,
+        );
+      }),
+    );
+  }
+
+  function nudge() {
+    const svg = screen.getByTestId("plan-svg");
+    const wallE = screen
+      .getAllByTestId("wall")
+      .find((w) => w.getAttribute("data-wall-label") === "E")!;
+    fireEvent.pointerDown(wallE, { clientX: 500, clientY: 200, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 499, clientY: 200 });
+    fireEvent.pointerUp(svg, { clientX: 499, clientY: 200 });
+  }
+
+  it("gives the arriving room the same door", async () => {
+    await twoRoomsWithDoor();
+    parkAlmostTouching(40);
+    nudge();
+
+    const p = useStore.getState().project;
+    expect(p.openings).toHaveLength(2);
+    const movedWalls = new Set(loopWallIds(p, p.walls.find((w) => w.label === "E")!.id));
+    expect(p.openings.some((o) => movedWalls.has(o.wallId))).toBe(true);
+  });
+
+  it("copies the door's size and kind", async () => {
+    const original = await twoRoomsWithDoor();
+    parkAlmostTouching(40);
+    nudge();
+
+    const copy = useStore.getState().project.openings.find((o) => o.id !== original.id)!;
+    expect(copy).toMatchObject({
+      kind: original.kind,
+      width: original.width,
+      height: original.height,
+    });
+  });
+
+  it("says what it did rather than adding a door silently", async () => {
+    await twoRoomsWithDoor();
+    parkAlmostTouching(40);
+    nudge();
+    expect(await screen.findByRole("status")).toHaveTextContent(/shared wall/i);
+  });
+
+  it("adds nothing when the rooms do not end up touching", async () => {
+    await twoRoomsWithDoor();
+    parkAlmostTouching(9000);
+    nudge();
+    expect(useStore.getState().project.openings).toHaveLength(1);
+  });
+
+  it("undoing the move takes the door back with it", async () => {
+    await twoRoomsWithDoor();
+    parkAlmostTouching(40);
+    nudge();
+    expect(useStore.getState().project.openings).toHaveLength(2);
+
+    act(() => useStore.getState().undo());
+    expect(useStore.getState().project.openings).toHaveLength(1);
   });
 });
