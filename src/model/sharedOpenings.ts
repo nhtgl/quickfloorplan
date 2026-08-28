@@ -1,6 +1,4 @@
 import { wallEnds, wallLength } from "./geometry";
-import { newId } from "./ids";
-import { openingSpan } from "./openings";
 import type { Opening, Point, Project, WallId } from "./types";
 
 /** How far apart two centrelines may sit and still count as the same wall, in mm. */
@@ -61,103 +59,88 @@ export function sharedSpan(
 }
 
 /**
- * Copy an opening from one wall onto a wall lying on top of it.
- *
- * The opening is placed by where it sits in the plan, not by its distance along the
- * other wall, because the two walls may run in opposite directions — which they do
- * whenever two rooms are pushed together, since each room's walls run round its own
- * outline. When they do, the hinge end and the side the leaf swings to both flip, so the
- * copy describes the same physical door rather than a mirror image of it.
+ * Walls lying on top of this one. Two rooms pushed together each keep their own walls,
+ * so the wall between them is described twice, once from each side.
  */
-export function mapOpeningOntoWall(
-  p: Project,
-  opening: Opening,
-  targetId: WallId,
-  sameDirection: boolean,
-): Opening {
+export function coincidentWalls(p: Project, wallId: WallId): WallId[] {
+  return p.walls
+    .filter((w) => w.id !== wallId && sharedSpan(p, wallId, w.id) !== null)
+    .map((w) => w.id);
+}
+
+/**
+ * An opening as it appears on a particular wall.
+ *
+ * There is only ever one door. When two rooms share a wall, both rooms' walls show that
+ * same door rather than each holding a copy, so moving or resizing it from either room
+ * changes the one door and the two can never drift apart.
+ *
+ * `offset`, `hinge` and `swing` describe the door as seen from this wall. Adjacent
+ * rooms' walls run in opposite directions, because each room's walls run round its own
+ * outline, so the numbers differ between the two views while the door they describe does
+ * not move: the hinge stays on the same jamb and the leaf swings into the same room.
+ */
+export type OpeningView = {
+  opening: Opening;
+  /** False when the opening belongs to a wall lying on top of this one. */
+  own: boolean;
+  /** mm along this wall, from its a end, to the opening's centre */
+  offset: number;
+  hinge?: "a" | "b";
+  swing?: "in" | "out";
+};
+
+function viewOnWall(p: Project, opening: Opening, wallId: WallId): OpeningView | null {
+  if (opening.wallId === wallId) {
+    return {
+      opening,
+      own: true,
+      offset: opening.offset,
+      hinge: opening.hinge,
+      swing: opening.swing,
+    };
+  }
+
+  const reach = sharedSpan(p, wallId, opening.wallId);
+  if (!reach) return null;
+
   const source = axisOf(p, opening.wallId);
-  const target = axisOf(p, targetId);
+  const target = axisOf(p, wallId);
   const centre = pointAt(source, opening.offset);
+  const offset = Math.round(along(target, centre));
+
+  // Only openings sitting wholly on the shared stretch belong to both walls. Half a door
+  // is not a door, and drawing the rest of it would put a measurement on the page that
+  // nobody took.
+  if (offset - opening.width / 2 < reach.from - 1) return null;
+  if (offset + opening.width / 2 > reach.to + 1) return null;
 
   const flip = <T extends string>(v: T | undefined, a: T, b: T) =>
     v === undefined ? undefined : v === a ? b : a;
 
   return {
-    ...opening,
-    id: newId("o"),
-    wallId: targetId,
-    offset: Math.round(along(target, centre)),
-    hinge: sameDirection ? opening.hinge : flip(opening.hinge, "a", "b"),
-    swing: sameDirection ? opening.swing : flip(opening.swing, "in", "out"),
+    opening,
+    own: false,
+    offset,
+    hinge: reach.sameDirection ? opening.hinge : flip(opening.hinge, "a", "b"),
+    swing: reach.sameDirection ? opening.swing : flip(opening.swing, "in", "out"),
   };
 }
-
-function overlapsExisting(p: Project, candidate: Opening): boolean {
-  const [start, end] = [
-    candidate.offset - candidate.width / 2,
-    candidate.offset + candidate.width / 2,
-  ];
-  return p.openings
-    .filter((o) => o.wallId === candidate.wallId)
-    .some((o) => {
-      const [s, e] = openingSpan(p, o.id);
-      return s < end && start < e;
-    });
-}
-
-export type ShareResult = { project: Project; added: Opening[] };
 
 /**
- * Where a moved run of walls has come to rest on top of another wall, give both walls
- * the openings the other has.
- *
- * A door between two rooms is one door, but this model gives every room its own walls,
- * so it has to appear in both for either room's elevation to be right. Openings that
- * would land only partly on the shared stretch are left alone: half a door is not a
- * door, and guessing at the rest would put a measurement on the page that nobody took.
+ * Every opening that appears on a wall: its own, and any belonging to a wall lying on
+ * top of it. Ordered along the wall, which is the order a setting-out chain reads in.
  */
-export function shareOpeningsAcrossTouchingWalls(
-  p: Project,
-  movedWallIds: WallId[],
-): ShareResult {
-  const moved = new Set(movedWallIds);
-  const stationary = p.walls.filter((w) => !moved.has(w.id));
-  let project = p;
-  const added: Opening[] = [];
+export function wallOpeningViews(p: Project, wallId: WallId): OpeningView[] {
+  const shared = new Set(coincidentWalls(p, wallId));
+  return p.openings
+    .filter((o) => o.wallId === wallId || shared.has(o.wallId))
+    .map((o) => viewOnWall(p, o, wallId))
+    .filter((v): v is OpeningView => v !== null)
+    .sort((a, b) => a.offset - b.offset);
+}
 
-  for (const movedId of movedWallIds) {
-    for (const other of stationary) {
-      const span = sharedSpan(project, movedId, other.id);
-      if (!span) continue;
-
-      const pairs: [WallId, WallId][] = [
-        [movedId, other.id],
-        [other.id, movedId],
-      ];
-
-      for (const [toId, fromId] of pairs) {
-        const reach = sharedSpan(project, toId, fromId);
-        if (!reach) continue;
-
-        for (const opening of project.openings.filter((o) => o.wallId === fromId)) {
-          const candidate = mapOpeningOntoWall(project, opening, toId, reach.sameDirection);
-          const [start, end] = [
-            candidate.offset - candidate.width / 2,
-            candidate.offset + candidate.width / 2,
-          ];
-          // Only openings that sit wholly on the shared stretch carry across.
-          if (start < reach.from - 1 || end > reach.to + 1) continue;
-          if (overlapsExisting(project, candidate)) continue;
-
-          project = { ...project, openings: [...project.openings, candidate] };
-          added.push(candidate);
-        }
-      }
-    }
-  }
-
-  return {
-    project: added.length ? { ...project, updatedAt: new Date().toISOString() } : p,
-    added,
-  };
+/** The span an opening view covers along its wall, as [start, end] in mm. */
+export function viewSpan(view: OpeningView): [number, number] {
+  return [view.offset - view.opening.width / 2, view.offset + view.opening.width / 2];
 }

@@ -1,5 +1,6 @@
 import { wallById, wallEnds, wallLength } from "./geometry";
 import { wallMeasuredSpan } from "./measure";
+import { viewSpan, wallOpeningViews } from "./sharedOpenings";
 import type { OpeningId, Point, Project } from "./types";
 
 export function openingById(p: Project, id: OpeningId) {
@@ -82,9 +83,8 @@ export function wallForOpening(p: Project, id: OpeningId) {
  */
 export function labelOffsetAlongWall(p: Project, wallId: string): number {
   const len = wallLength(p, wallId);
-  const spans = p.openings
-    .filter((o) => o.wallId === wallId)
-    .map((o) => openingSpan(p, o.id))
+  const spans = wallOpeningViews(p, wallId)
+    .map((view) => viewSpan(view))
     .sort((a, b) => a[0] - b[0]);
 
   let best: [number, number] = [0, len];
@@ -124,13 +124,11 @@ export function wallDimensionChain(p: Project, wallId: string): ChainSegment[] {
   const span = wallMeasuredSpan(p, wallId);
   const clamp = (v: number) => Math.max(span.start, Math.min(span.end, v));
 
-  const spans = p.openings
-    .filter((o) => o.wallId === wallId)
-    .map((o) => ({
-      id: o.id,
-      start: clamp(o.offset - o.width / 2),
-      end: clamp(o.offset + o.width / 2),
-    }))
+  const spans = wallOpeningViews(p, wallId)
+    .map((view) => {
+      const [start, end] = viewSpan(view);
+      return { id: view.opening.id, start: clamp(start), end: clamp(end) };
+    })
     .filter((s) => s.end > s.start)
     .sort((a, b) => a.start - b.start);
 

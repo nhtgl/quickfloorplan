@@ -20,6 +20,7 @@ import {
   updateWall,
 } from "../model/ops";
 import { labelOffsetAlongWall } from "../model/openings";
+import { wallOpeningViews } from "../model/sharedOpenings";
 import { roomArea } from "../model/rooms";
 import type { Opening, OpeningKind, Project } from "../model/types";
 import { formatArea, formatLength, parseLength, stepFor } from "../model/units";
@@ -326,9 +327,8 @@ function OpeningList({ wallId, wallLabel }: { wallId: string; wallLabel: string 
 
   const unit = projectUnit(project);
   const faceStart = wallMeasuredSpan(project, wallId).start;
-  const openings = project.openings
-    .filter((o) => o.wallId === wallId)
-    .sort((a, b) => a.offset - b.offset);
+  // Includes openings in a wall lying on this one: one door, shown from both sides.
+  const openings = wallOpeningViews(project, wallId);
 
   function add(kind: OpeningKind) {
     let created = "";
@@ -349,29 +349,39 @@ function OpeningList({ wallId, wallLabel }: { wallId: string; wallLabel: string 
       {openings.length === 0 && <p className="hint">Nothing in this wall yet.</p>}
 
       <ul>
-        {openings.map((o) => (
-          <li key={o.id}>
-            <button
-              className="opening-row"
-              data-testid="opening-row"
-              onClick={() => select({ kind: "opening", id: o.id })}
-            >
-              <strong>{KIND_NAME[o.kind]}</strong>
-              <span>
-                {formatLength(o.offset - faceStart, unit)} {unit} from {wallLabel} ·{" "}
-                {formatLength(o.width, unit)} × {formatLength(o.height, unit)} {unit}
-                {o.sill > 0 ? ` · sill ${formatLength(o.sill, unit)} ${unit}` : ""}
-              </span>
-            </button>
-            <button
-              className="row-delete"
-              aria-label={`Delete ${KIND_NAME[o.kind].toLowerCase()}`}
-              onClick={() => apply((p) => deleteOpening(p, o.id))}
-            >
-              ×
-            </button>
-          </li>
-        ))}
+        {openings.map((view) => {
+          const o = view.opening;
+          const otherWall = view.own
+            ? null
+            : project.walls.find((w) => w.id === o.wallId)?.label;
+          return (
+            <li key={o.id}>
+              <button
+                className="opening-row"
+                data-testid="opening-row"
+                data-shared={view.own ? undefined : "true"}
+                onClick={() => select({ kind: "opening", id: o.id })}
+              >
+                <strong>
+                  {KIND_NAME[o.kind]}
+                  {otherWall && <em className="shared-tag">shared with wall {otherWall}</em>}
+                </strong>
+                <span>
+                  {formatLength(view.offset - faceStart, unit)} {unit} from {wallLabel} ·{" "}
+                  {formatLength(o.width, unit)} × {formatLength(o.height, unit)} {unit}
+                  {o.sill > 0 ? ` · sill ${formatLength(o.sill, unit)} ${unit}` : ""}
+                </span>
+              </button>
+              <button
+                className="row-delete"
+                aria-label={`Delete ${KIND_NAME[o.kind].toLowerCase()}`}
+                onClick={() => apply((p) => deleteOpening(p, o.id))}
+              >
+                ×
+              </button>
+            </li>
+          );
+        })}
       </ul>
 
       <div className="add-row">

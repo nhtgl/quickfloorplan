@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { emptyProject } from "./factory";
 import { buildFromMeasurements, parseMeasurements } from "./fromMeasurements";
 import { loopWallIds, moveLoop } from "./loops";
+import { wallEnds } from "./geometry";
 import { addOpeningAtOffset } from "./ops";
-import { openingPlanSegment } from "./openings";
-import { sharedSpan, shareOpeningsAcrossTouchingWalls } from "./sharedOpenings";
+import { sharedSpan, wallOpeningViews } from "./sharedOpenings";
 import type { Project } from "./types";
 
 const parse = (t: string) => {
@@ -71,91 +71,104 @@ describe("sharedSpan", () => {
   });
 });
 
-describe("shareOpeningsAcrossTouchingWalls", () => {
+describe("wallOpeningViews", () => {
   function withDoorOnB(): Project {
     const p = pushedTogether();
     return addOpeningAtOffset(p, wall(p, "B").id, 1200, "door").project;
   }
 
-  it("gives the newly touching wall the same door", () => {
+  it("shows the door on the wall it belongs to", () => {
     const p = withDoorOnB();
-    const moved = loopWallIds(p, wall(p, "E").id);
-    const { project, added } = shareOpeningsAcrossTouchingWalls(p, moved);
-
-    expect(added).toHaveLength(1);
-    expect(added[0].wallId).toBe(touchingWall(p));
-    expect(project.openings).toHaveLength(2);
+    const views = wallOpeningViews(p, wall(p, "B").id);
+    expect(views).toHaveLength(1);
+    expect(views[0].own).toBe(true);
+    expect(views[0].offset).toBe(p.openings[0].offset);
   });
 
-  it("puts the copy in the same place in the plan, not the same distance along", () => {
+  it("shows the same door on the wall lying against it", () => {
     const p = withDoorOnB();
-    const original = p.openings[0];
-    const { project, added } = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, wall(p, "E").id));
-
-    const before = openingPlanSegment(p, original.id);
-    const after = openingPlanSegment(project, added[0].id);
-    // Same physical doorway: the two spans cover the same points.
-    const ends = [after.from, after.to].sort((u, v) => u.y - v.y);
-    const was = [before.from, before.to].sort((u, v) => u.y - v.y);
-    expect(ends[0].y).toBe(was[0].y);
-    expect(ends[1].y).toBe(was[1].y);
+    const views = wallOpeningViews(p, touchingWall(p));
+    expect(views).toHaveLength(1);
+    expect(views[0].own).toBe(false);
+    // The very same door, not a copy of it.
+    expect(views[0].opening.id).toBe(p.openings[0].id);
   });
 
-  it("flips the hinge and the swing, so the leaf still opens the same way", () => {
+  it("never adds a second door to the project", () => {
     const p = withDoorOnB();
-    const original = p.openings[0];
-    const { added } = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, wall(p, "E").id));
-    // The walls run opposite ways, so both have to flip to describe one physical door.
-    expect(added[0].hinge).not.toBe(original.hinge);
-    expect(added[0].swing).not.toBe(original.swing);
+    wallOpeningViews(p, touchingWall(p));
+    expect(p.openings).toHaveLength(1);
   });
 
-  it("keeps the door's size", () => {
+  it("leaves the stored door untouched, hinge and swing included", () => {
     const p = withDoorOnB();
-    const { added } = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, wall(p, "E").id));
-    expect(added[0]).toMatchObject({ kind: "door", width: 900, height: 2050, sill: 0 });
+    const before = { ...p.openings[0] };
+    wallOpeningViews(p, touchingWall(p));
+    expect(p.openings[0]).toEqual(before);
   });
 
-  it("works the other way too: a door in the moved room reaches the wall it lands on", () => {
-    let p = pushedTogether();
-    p = addOpeningAtOffset(p, touchingWall(p), 1200, "door").project;
-    const { added } = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, wall(p, "E").id));
-    expect(added).toHaveLength(1);
-    expect(added[0].wallId).toBe(wall(p, "B").id);
-  });
-
-  it("does not add the door twice when the rooms are moved again", () => {
+  it("places the door at the same point in the plan seen from either wall", () => {
     const p = withDoorOnB();
-    const once = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, wall(p, "E").id));
-    const twice = shareOpeningsAcrossTouchingWalls(
-      once.project,
-      loopWallIds(once.project, wall(once.project, "E").id),
-    );
-    expect(twice.added).toHaveLength(0);
-    expect(twice.project.openings).toHaveLength(2);
+    const fromB = wallOpeningViews(p, wall(p, "B").id)[0];
+    const other = touchingWall(p);
+    const fromOther = wallOpeningViews(p, other)[0];
+
+    const at = (wallId: string, offset: number) => {
+      const ends = wallEnds(p, wallId);
+      const len = Math.hypot(ends.b.x - ends.a.x, ends.b.y - ends.a.y);
+      return {
+        x: Math.round(ends.a.x + ((ends.b.x - ends.a.x) / len) * offset),
+        y: Math.round(ends.a.y + ((ends.b.y - ends.a.y) / len) * offset),
+      };
+    };
+    expect(at(other, fromOther.offset)).toEqual(at(wall(p, "B").id, fromB.offset));
   });
 
-  it("leaves rooms that are not touching alone", () => {
-    let p = pushedTogether();
-    p = addOpeningAtOffset(p, wall(p, "B").id, 1200, "door").project;
+  it("describes the same physical hinge and swing from the other side", () => {
+    const p = withDoorOnB();
+    const mine = wallOpeningViews(p, wall(p, "B").id)[0];
+    const theirs = wallOpeningViews(p, touchingWall(p))[0];
+    // The two walls run opposite ways, so the same jamb and the same swing direction
+    // are named differently from each side. The door itself has not moved.
+    expect(theirs.hinge).not.toBe(mine.hinge);
+    expect(theirs.swing).not.toBe(mine.swing);
+  });
+
+  it("follows the door when it is moved, from both sides at once", () => {
+    let p = withDoorOnB();
+    const id = p.openings[0].id;
+    p = { ...p, openings: p.openings.map((o) => ({ ...o, offset: 2000 })) };
+
+    expect(wallOpeningViews(p, wall(p, "B").id)[0].offset).toBe(2000);
+    // Still one door, and the other side sees the move too.
+    expect(p.openings).toHaveLength(1);
+    expect(wallOpeningViews(p, touchingWall(p))[0].opening.id).toBe(id);
+    expect(wallOpeningViews(p, touchingWall(p))[0].offset).toBe(1000);
+  });
+
+  it("shows nothing extra once the rooms are pulled apart", () => {
+    let p = withDoorOnB();
+    const other = touchingWall(p);
     p = moveLoop(p, wall(p, "E").id, 5000, 0);
-    const { added } = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, wall(p, "E").id));
-    expect(added).toEqual([]);
+    expect(wallOpeningViews(p, other)).toEqual([]);
+    expect(wallOpeningViews(p, wall(p, "B").id)).toHaveLength(1);
   });
 
-  it("carries a passage across as readily as a door", () => {
-    let p = pushedTogether();
-    p = addOpeningAtOffset(p, wall(p, "B").id, 1200, "passage").project;
-    const { added } = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, wall(p, "E").id));
-    expect(added[0].kind).toBe("passage");
+  it("shares a passage as readily as a door", () => {
+    const start = pushedTogether();
+    const built = addOpeningAtOffset(start, wall(start, "B").id, 1200, "passage").project;
+    const views = wallOpeningViews(built, touchingWall(built));
+    expect(views[0]?.opening.kind).toBe("passage");
   });
 
-  it("leaves an opening that only half overlaps the shared stretch", () => {
+  it("does not show an opening that only half reaches the shared stretch", () => {
     let p = pushedTogether();
-    // Shift the second room so only part of the two walls coincide.
     p = moveLoop(p, wall(p, "E").id, 0, 2800);
     p = addOpeningAtOffset(p, wall(p, "B").id, 1000, "door").project;
-    const { added } = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, wall(p, "E").id));
-    expect(added).toEqual([]);
+    // The wall of the other room, not wall B itself, which trivially lies on itself.
+    const bId = wall(p, "B").id;
+    const other = loopWallIds(p, wall(p, "E").id).find((id) => sharedSpan(p, id, bId));
+    expect(other).toBeDefined();
+    expect(wallOpeningViews(p, other!)).toEqual([]);
   });
 });

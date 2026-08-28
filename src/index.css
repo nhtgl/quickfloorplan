@@ -240,3 +240,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 .photo-fields .hint { font-size: 12px; }
 .photo-buttons { display: flex; gap: 4px; flex-shrink: 0; }
 .photo-buttons button { padding: 4px 9px; }
+
+.shared-tag {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--dim);
+  background: var(--chrome);
+  border-radius: 9px;
+  padding: 1px 7px;
+  margin-left: 6px;
+}

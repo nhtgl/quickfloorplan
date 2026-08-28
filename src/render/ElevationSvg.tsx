@@ -1,7 +1,8 @@
 import { wallById, wallHeight } from "../model/geometry";
 import { projectUnit } from "../model/factory";
 import { wallMeasuredLength, wallMeasuredSpan } from "../model/measure";
-import { openingRect, wallDimensionChain } from "../model/openings";
+import { wallDimensionChain } from "../model/openings";
+import { wallOpeningViews } from "../model/sharedOpenings";
 import type { Project, WallId } from "../model/types";
 import { formatLengthWithUnit } from "../model/units";
 import { DimLine } from "./dimensions";
@@ -38,7 +39,9 @@ export function ElevationSvg(props: ElevationSvgProps) {
   const len = wallMeasuredLength(p, wallId);
   const along = (centrelineDistance: number) => centrelineDistance - span.start;
   const h = wallHeight(p, wallId);
-  const openings = p.openings.filter((o) => o.wallId === wallId);
+  // Includes the openings of any wall lying on this one, so a door between two rooms
+  // shows on both rooms' elevations without being stored twice.
+  const openings = wallOpeningViews(p, wallId);
   const unit = projectUnit(p);
   const chain = wallDimensionChain(p, wallId);
 
@@ -74,9 +77,14 @@ export function ElevationSvg(props: ElevationSvgProps) {
         strokeWidth={hairline * 2}
       />
 
-      {openings.map((o) => {
-        const raw = openingRect(p, o.id);
-        const r = { ...raw, x: along(raw.x) };
+      {openings.map((view) => {
+        const o = view.opening;
+        const r = {
+          x: along(Math.round(view.offset - o.width / 2)),
+          y: o.sill,
+          w: o.width,
+          h: o.height,
+        };
         const alert = alertIds.includes(o.id);
         const selected = highlightIds.includes(o.id);
         const colour = alert ? ALERT : selected ? ACCENT : WALL;

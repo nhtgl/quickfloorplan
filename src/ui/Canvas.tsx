@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { addOpening, addRoom, commitWallChain, moveNode } from "../model/ops";
-import { loopWallIds, moveLoop, roomsInLoop } from "../model/loops";
-import { shareOpeningsAcrossTouchingWalls } from "../model/sharedOpenings";
+import { moveLoop, roomsInLoop } from "../model/loops";
 import { snapLoopDelta } from "./loopSnap";
 import { projectUnit } from "../model/factory";
 import type { Point } from "../model/types";
@@ -16,15 +15,7 @@ type Draft = { points: Point[]; cursor: Point | null; guides: Guide[] };
 
 const EMPTY: Draft = { points: [], cursor: null, guides: [] };
 
-export function Canvas({
-  width,
-  height,
-  onNotify,
-}: {
-  width: number;
-  height: number;
-  onNotify?: (message: string) => void;
-}) {
+export function Canvas({ width, height }: { width: number; height: number }) {
   const project = useStore((s) => s.project);
   const tool = useStore((s) => s.tool);
   const selection = useStore((s) => s.selection);
@@ -196,28 +187,8 @@ export function Canvas({
     panning.current = null;
     dragging.current = null;
 
-    const drag = loopDrag.current;
     loopDrag.current = null;
     setLoopGuides([]);
-    if (!drag || (drag.applied.x === 0 && drag.applied.y === 0)) return;
-
-    // A door between two rooms is one door, but each room carries its own walls, so it
-    // has to appear in both for either elevation to be right. Done on drop rather than
-    // during the drag: openings should not appear and vanish as the room is nudged.
-    // Transient, so undoing the move undoes the doors it brought with it.
-    let added = 0;
-    applyTransient((p) => {
-      const result = shareOpeningsAcrossTouchingWalls(p, loopWallIds(p, drag.wallId));
-      added = result.added.length;
-      return result.project;
-    });
-    if (added > 0) {
-      onNotify?.(
-        added === 1
-          ? "Carried the opening in the shared wall through to both rooms."
-          : `Carried ${added} openings in the shared walls through to both rooms.`,
-      );
-    }
   }
 
   /** Begin dragging the whole run of walls that `wallId` belongs to. */

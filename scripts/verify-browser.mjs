@@ -100,7 +100,7 @@ const project = {
     { id: "o1", wallId: "w1", kind: "window", offset: 1600, width: 1400, height: 1500, sill: 850 },
     { id: "o2", wallId: "w1", kind: "window", offset: 3800, width: 1000, height: 1500, sill: 850 },
     { id: "o3", wallId: "w4", kind: "door", offset: 1700, width: 900, height: 2050, sill: 0, hinge: "a", swing: "in" },
-    { id: "o4", wallId: "w2", kind: "passage", offset: 1700, width: 1100, height: 2100, sill: 0 },
+    { id: "o4", wallId: "w2", kind: "door", offset: 1700, width: 1100, height: 2100, sill: 0, hinge: "a", swing: "in" },
   ],
   rooms: [
     { id: "r1", name: "Hall", tint: "#e8f0fe",
@@ -266,15 +266,12 @@ await page.waitForTimeout(150);
 const edgesAfter = await roomEdges();
 const openingsAfter = await page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
-  const shared = new Set(
-    raw.walls.filter((w) => ["E", "F", "G", "H"].includes(w.label)).map((w) => w.id),
-  );
-  return {
-    total: raw.openings.length,
-    onMovedRoom: raw.openings.filter((o) => shared.has(o.wallId)).length,
-  };
+  return { total: raw.openings.length };
 });
-const doorToast = await page.locator('[role="status"]').textContent().catch(() => "");
+// Arcs are counted again after the move: the original front door plus the shared one,
+// each drawn once. A third would mean the shared view had produced a reflection.
+const arcsAfterMove = await page.locator('.stage [data-testid="door-arc"]').count();
+const sharedCuts = await page.locator('.stage [data-testid="shared-opening-cut"]').count();
 await page.screenshot({ path: join(OUT, "rooms-snapped.png") });
 
 const [download] = await Promise.all([
@@ -316,8 +313,9 @@ const checks = [
   ["PDF gains a sketch page and a photo page", pages === 11],
   ["dragging a room shows a snap guide", dragGuides > 0],
   ["the dragged room lands flush against the other", edgesAfter.movingLeft === edgesAfter.stationaryRight],
-  ["the door in the shared wall reaches the arriving room", openingsAfter.onMovedRoom >= 1],
-  ["and it says so rather than doing it silently", (doorToast ?? "").toLowerCase().includes("shared wall")],
+  ["no second door is created when rooms meet", openingsAfter.total === 4],
+  ["the shared wall cuts its own gap so the door still shows", sharedCuts >= 1],
+  ["each door drawn once, so none is mirrored", arcsAfterMove === 2],
   ["no page or console errors", problems.length === 0],
 ];
 

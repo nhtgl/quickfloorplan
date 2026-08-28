@@ -16,6 +16,8 @@ import {
   openingPlanSegment,
   wallDimensionChain,
 } from "../model/openings";
+import { pointAlongWall as alongWall } from "../model/geometry";
+import { viewSpan, wallOpeningViews } from "../model/sharedOpenings";
 import { edgeHasWallBehind, roomArea } from "../model/rooms";
 import type { Point, Project } from "../model/types";
 import { formatArea, formatDeg, formatLengthWithUnit } from "../model/units";
@@ -175,6 +177,31 @@ export function PlanSvg(props: PlanSvgProps) {
           />
         );
       })}
+
+      {/* A wall lying on top of another has to cut its own gap, or it would paint over
+          the opening the other wall already cut and the door would vanish. */}
+      {p.walls.flatMap((w) =>
+        wallOpeningViews(p, w.id)
+          .filter((view) => !view.own)
+          .map((view) => {
+            const [start, end] = viewSpan(view);
+            const from = alongWall(p, w.id, start);
+            const to = alongWall(p, w.id, end);
+            return (
+              <line
+                key={`${w.id}-${view.opening.id}-cut`}
+                data-testid="shared-opening-cut"
+                x1={from.x}
+                y1={from.y}
+                x2={to.x}
+                y2={to.y}
+                stroke={PAPER}
+                strokeWidth={w.thickness}
+                strokeLinecap="butt"
+              />
+            );
+          }),
+      )}
 
       {/* Openings cut the wall, then draw their own symbol over the gap. */}
       {p.openings.map((o) => {

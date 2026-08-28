@@ -7,7 +7,8 @@ import { loopGap, wallLength } from "../model/geometry";
 import { wallMeasuredLength } from "../model/measure";
 import { addPhoto, makePhoto } from "../model/photos";
 import { loopNodeIds, loopWallIds, moveLoop } from "../model/loops";
-import { addOpeningAtOffset } from "../model/ops";
+import { addOpeningAtOffset, updateOpening } from "../model/ops";
+import { sharedSpan, wallOpeningViews } from "../model/sharedOpenings";
 import { pageTitles } from "../export/pageTitles";
 import { roomArea } from "../model/rooms";
 import { useStore } from "../state/store";
@@ -876,7 +877,6 @@ describe("a door in a wall two rooms come to share", () => {
     }
     await userEvent.click(screen.getByRole("button", { name: "Select" }));
 
-    // A door in the first room's right-hand wall, the one the other room will meet.
     act(() =>
       useStore.getState().apply((p) => {
         const b = p.walls.find((w) => w.label === "B")!;
@@ -917,51 +917,83 @@ describe("a door in a wall two rooms come to share", () => {
     fireEvent.pointerUp(svg, { clientX: 499, clientY: 200 });
   }
 
-  it("gives the arriving room the same door", async () => {
-    await twoRoomsWithDoor();
-    parkAlmostTouching(40);
-    nudge();
-
+  /** The wall of the arriving room that has come to rest on wall B. */
+  function sharedWallId() {
     const p = useStore.getState().project;
-    expect(p.openings).toHaveLength(2);
-    const movedWalls = new Set(loopWallIds(p, p.walls.find((w) => w.label === "E")!.id));
-    expect(p.openings.some((o) => movedWalls.has(o.wallId))).toBe(true);
-  });
+    const b = p.walls.find((w) => w.label === "B")!.id;
+    return loopWallIds(p, p.walls.find((w) => w.label === "E")!.id).find((id) =>
+      sharedSpan(p, id, b),
+    );
+  }
 
-  it("copies the door's size and kind", async () => {
+  it("leaves the door exactly as it was, with no second door made", async () => {
     const original = await twoRoomsWithDoor();
     parkAlmostTouching(40);
     nudge();
 
-    const copy = useStore.getState().project.openings.find((o) => o.id !== original.id)!;
-    expect(copy).toMatchObject({
-      kind: original.kind,
-      width: original.width,
-      height: original.height,
-    });
+    const p = useStore.getState().project;
+    expect(p.openings).toHaveLength(1);
+    expect(p.openings[0]).toEqual(original);
   });
 
-  it("says what it did rather than adding a door silently", async () => {
+  it("shows that one door on the arriving room's wall too", async () => {
+    const original = await twoRoomsWithDoor();
+    parkAlmostTouching(40);
+    nudge();
+
+    const p = useStore.getState().project;
+    const views = wallOpeningViews(p, sharedWallId()!);
+    expect(views).toHaveLength(1);
+    expect(views[0].opening.id).toBe(original.id);
+    expect(views[0].own).toBe(false);
+  });
+
+  it("lists it in the arriving wall's panel, marked as shared", async () => {
     await twoRoomsWithDoor();
     parkAlmostTouching(40);
     nudge();
-    expect(await screen.findByRole("status")).toHaveTextContent(/shared wall/i);
+
+    act(() => useStore.getState().select({ kind: "wall", id: sharedWallId()! }));
+    const rows = await screen.findAllByTestId("opening-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].getAttribute("data-shared")).toBe("true");
+    expect(rows[0]).toHaveTextContent(/shared with wall B/);
   });
 
-  it("adds nothing when the rooms do not end up touching", async () => {
-    await twoRoomsWithDoor();
-    parkAlmostTouching(9000);
+  it("moving the door moves it for both rooms, because it is one door", async () => {
+    const original = await twoRoomsWithDoor();
+    parkAlmostTouching(40);
     nudge();
+
+    const before = wallOpeningViews(useStore.getState().project, sharedWallId()!)[0].offset;
+    act(() =>
+      useStore.getState().apply((p) => updateOpening(p, original.id, { offset: 2000 })),
+    );
+    const after = wallOpeningViews(useStore.getState().project, sharedWallId()!)[0].offset;
+
+    expect(after).not.toBe(before);
     expect(useStore.getState().project.openings).toHaveLength(1);
   });
 
-  it("undoing the move takes the door back with it", async () => {
+  it("shows nothing on the other wall once the rooms are pulled apart", async () => {
     await twoRoomsWithDoor();
     parkAlmostTouching(40);
     nudge();
-    expect(useStore.getState().project.openings).toHaveLength(2);
+    const shared = sharedWallId()!;
+    expect(wallOpeningViews(useStore.getState().project, shared)).toHaveLength(1);
 
-    act(() => useStore.getState().undo());
+    act(() =>
+      useStore
+        .getState()
+        .apply((p) => moveLoop(p, p.walls.find((w) => w.label === "E")!.id, 6000, 0)),
+    );
+    expect(wallOpeningViews(useStore.getState().project, shared)).toEqual([]);
+  });
+
+  it("shows nothing extra when the rooms never touch", async () => {
+    await twoRoomsWithDoor();
+    parkAlmostTouching(9000);
+    nudge();
     expect(useStore.getState().project.openings).toHaveLength(1);
   });
 });
