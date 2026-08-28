@@ -1,0 +1,7 @@
+services:
+  quickfloorplan:
+    # Swap `image` for `build: .` to run your own changes.
+    image: ghcr.io/nhtgl/quickfloorplan:latest
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

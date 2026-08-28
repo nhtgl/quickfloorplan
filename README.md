@@ -1,18 +1,58 @@
 # QuickFloorPlan
 
-Sketch the walls of a flat, type in the measurements you took with a tape, mark the doors
-and windows, outline the rooms, and export a PDF you can hand to a builder, architect, or
-kitchen fitter.
+Measure a flat with a tape, type the numbers in, and export a PDF a builder can work from.
 
-It is a communication document, not a construction drawing. It says "this is roughly the
-shape of the space and here are the numbers I measured." A professional takes it from there.
+[![CI](https://github.com/nhtgl/quickfloorplan/actions/workflows/ci.yml/badge.svg)](https://github.com/nhtgl/quickfloorplan/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+## This is not a visualisation tool
+
+It will not show you what your flat looks like. There is no 3D, no rendering, no materials,
+no furniture, no lighting, no colours beyond flat tints for telling one room from another.
+The drawings are deliberately plain, and they are not to scale — the printed page is fitted
+to the paper, so measuring off it gives the wrong answer.
+
+**The numbers are the product.** Everything here exists to get measurements out of your head
+and onto a page that someone else can build from: wall lengths, the angles between them,
+ceiling heights, and where the doors and windows sit along each wall. If you want to see
+your flat, use something else. If you want to tell a kitchen fitter that the wall is 3.42 m
+and the window starts 90 cm along it, this is the tool.
+
+It is meant for people who are not designers, and its output is a starting point for a
+professional, not a construction drawing.
+
+## Run it
+
+```bash
+docker run -p 8080:8080 ghcr.io/nhtgl/quickfloorplan:latest
 ```
+
+Then open <http://localhost:8080>. That is the whole thing: no accounts, no database, no
+network calls. Images are published for amd64 and arm64.
+
+With Compose:
+
+```bash
+curl -O https://raw.githubusercontent.com/nhtgl/quickfloorplan/main/docker-compose.yml
+docker compose up -d
+```
+
+Or from source:
+
+```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # unit and component tests
-npm run verify   # builds, then drives the real app in Chrome and checks the PDF
 ```
+
+## Your data stays yours
+
+Projects are `.floorplan.json` files on your own disk. Nothing is uploaded anywhere, there
+is no telemetry, and the container serves static files and talks to nothing. Reference
+photos are stored inside the project file, so a project stays one thing you can send to
+someone.
+
+The app also autosaves to your browser so a refresh never loses work, but that is a crash
+net, not storage. The file on disk is the artifact you own.
 
 ## Using it
 
@@ -110,6 +150,24 @@ Reference photos come last, one to a page.
 Pages are scaled to fit, not drawn at 1:50, so the footer says so. Read the numbers, don't
 measure the printout.
 
+## Development
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # unit and component tests
+npm run verify   # builds, then drives the real app in Chrome and checks the PDF
+npm run build    # type-check and produce dist/
+```
+
+`npm run verify` uses the Chrome already on your machine, so there is no browser to
+download. Set `BASE_URL` to point it at something already running — a container, say:
+
+```bash
+docker run -d -p 8080:8080 quickfloorplan
+BASE_URL=http://localhost:8080 node scripts/verify-browser.mjs
+```
+
 ## Layout
 
 | Path | What lives there |
@@ -135,3 +193,32 @@ It does **not** cover PDF export. jsdom implements no SVG layout — no `getBBox
 fails. Stubbing that would only test the stubs. `npm run verify` builds the app, drives it in
 Chrome, exports a real PDF and checks the pages that come out. Run it before trusting a
 change to anything under `src/render/` or `src/export/`.
+
+## Building the container yourself
+
+```bash
+docker build -t quickfloorplan .
+docker run -p 8080:8080 quickfloorplan
+```
+
+It is a two-stage build: Node compiles the app, then nginx serves the result. The runtime
+image is about 78 MB, listens on 8080 and runs as a non-root user. A strict
+Content-Security-Policy confines the page to its own origin, which it can afford to do
+because it never talks to anything.
+
+## Contributing
+
+Bug reports and pull requests are welcome. Two things worth knowing before you change
+anything:
+
+- `src/model/` is pure and has no React or DOM imports. Every rule that can be wrong in a
+  way a user would notice lives there, and it is tested without a browser. Keep it that way.
+- If you touch `src/render/` or `src/export/`, run `npm run verify`. The unit suite does not
+  cover PDF output and cannot, for the reason given above.
+
+Run `npm test` and `npx tsc --noEmit` before opening a pull request. CI runs both, plus the
+browser checks and a container build.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

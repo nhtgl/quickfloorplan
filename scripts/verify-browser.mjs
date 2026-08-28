@@ -72,8 +72,11 @@ const server = createServer(async (req, res) => {
     res.writeHead(404).end("not found");
   }
 });
-await new Promise((r) => server.listen(0, r));
-const base = `http://localhost:${server.address().port}`;
+// Point at an already-running instance to check a built container, rather than the
+// local dist: BASE_URL=http://localhost:8080 node scripts/verify-browser.mjs
+const external = process.env.BASE_URL;
+if (!external) await new Promise((r) => server.listen(0, r));
+const base = external ?? `http://localhost:${server.address().port}`;
 
 const project = {
   schema: "quickfloorplan/1",
@@ -115,8 +118,12 @@ const photoPath = join(OUT, "reference.png");
 await mkdir(OUT, { recursive: true });
 await writeFile(photoPath, makePng(2400, 1800));
 
-// Uses the system Chrome so this needs no extra browser download.
-const browser = await chromium.launch({ channel: "chrome" });
+// Locally this uses the system Chrome, so there is no browser to download. CI sets
+// PLAYWRIGHT_CHANNEL=chromium to use Playwright's own build instead.
+const channel = process.env.PLAYWRIGHT_CHANNEL ?? "chrome";
+const browser = await chromium.launch(
+  channel === "chromium" ? {} : { channel },
+);
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
 const problems = [];
 page.on("pageerror", (e) => problems.push(`page error: ${e.message}`));
@@ -274,5 +281,5 @@ console.log(`\npdf: ${pdfPath} (${pdf.length} bytes, ${pages} pages)`);
 console.log(`screenshot: ${join(OUT, "app.png")}`);
 
 await browser.close();
-server.close();
+if (!external) server.close();
 process.exit(checks.every(([, ok]) => ok) ? 0 : 1);
