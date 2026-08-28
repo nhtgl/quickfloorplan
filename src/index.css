@@ -255,3 +255,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 .faces { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
 .faces h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); margin: 0 0 10px; }
 .faces .hint { font-size: 12px; margin: 2px 0 0; }
+
+.lines { margin-top: 4px; }
+.lines h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); margin: 0 0 10px; }
+.lines .hint { font-size: 12px; margin: 2px 0 0; }

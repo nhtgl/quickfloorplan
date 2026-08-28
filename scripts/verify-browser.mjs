@@ -215,6 +215,22 @@ await page.keyboard.press("Escape");
 await page.getByRole("button", { name: "Select" }).click();
 await page.locator('[data-wall-label="A"]').first().dispatchEvent("click");
 const faceFields = await page.locator('[data-testid="wall-faces"] input').count();
+const lengthFields = await page.locator('[data-testid="wall-lengths"] input').count();
+const lengthLabels = await page
+  .locator('[data-testid="wall-lengths"] .field > span:first-child')
+  .allTextContents();
+// Typing a length against one line must move the other two by the same amount.
+const linesBefore = await page
+  .locator('[data-testid="wall-lengths"] input')
+  .evaluateAll((els) => els.map((e) => Number(e.value)));
+const outerField = page.locator('[data-testid="wall-lengths"] input').last();
+await outerField.fill("450");
+await outerField.blur();
+await page.waitForTimeout(150);
+const linesAfter = await page
+  .locator('[data-testid="wall-lengths"] input')
+  .evaluateAll((els) => els.map((e) => Number(e.value)));
+const shifts = new Set(linesAfter.map((v, i) => v - linesBefore[i]));
 const beforeFaces = await page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
   return raw.walls.find((w) => w.label === "A").offsets;
@@ -380,6 +396,9 @@ const checks = [
   ["every wall shows its centreline as well as its two faces", centrelines === wallCount && wallCount > 0],
   ["a file written with the old single thickness still opens", migrated.left === 60 && migrated.right === 60],
   ["each face has its own field", faceFields === 2],
+  ["each of the three lines has its own length field", lengthFields === 3],
+  ["the lines are named, not just left and right", lengthLabels.includes("Centreline")],
+  ["typing one length shifts all three by the same amount", shifts.size === 1 && [...shifts][0] !== 0],
   ["editing one face leaves the other alone", afterFaces.left === 300 && afterFaces.right === beforeFaces.right],
   ["drawing catches a wall face, not only its centreline", snapKind === "face"],
   ["no page or console errors", problems.length === 0],

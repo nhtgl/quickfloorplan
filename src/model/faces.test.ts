@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 import { chainOfWalls, emptyProject } from "./factory";
 import { updateWall } from "./ops";
 import { allFaceCorners, wallFaceCorners, wallLinePoints, wallSideNames } from "./faces";
-import { wallMeasuredLength } from "./measure";
+import {
+  centrelineForSideLength,
+  wallLengthForSide,
+  wallMeasuredLength,
+} from "./measure";
 import { wallThickness } from "./walls";
 import type { Point, Project } from "./types";
 
@@ -168,14 +172,82 @@ describe("wallSideNames", () => {
     };
     const names = wallSideNames(p, wall(p, "A"));
     expect(names.left).toBe("Kitchen");
-    expect(names.right).toBe("Other side");
+    expect(names.right).toBe("Outside");
   });
 
-  it("falls back when there is no room either side", () => {
+  it("names the two sides of a closed room inside and outside", () => {
     const p = rect();
-    expect(wallSideNames(p, wall(p, "A"))).toEqual({
-      left: "Other side",
-      right: "Other side",
-    });
+    expect(wallSideNames(p, wall(p, "A"))).toEqual({ left: "Inside", right: "Outside" });
+  });
+
+  it("falls back to left and right for a wall enclosing nothing", () => {
+    const open = chainOfWalls(
+      emptyProject("t"),
+      [{ x: 0, y: 0 }, { x: 4000, y: 0 }],
+      false,
+      100,
+    );
+    expect(wallSideNames(open, open.walls[0].id)).toEqual({ left: "Left", right: "Right" });
+  });
+
+  it("always gives the two sides different names", () => {
+    const p = rect();
+    const names = wallSideNames(p, wall(p, "A"));
+    expect(names.left).not.toBe(names.right);
+  });
+});
+
+describe("the length of each line", () => {
+  it("measures each of the three lines", () => {
+    const p = rect();
+    const id = wall(p, "A");
+    expect(wallLengthForSide(p, id, 0)).toBe(4200);
+    expect(wallLengthForSide(p, id, 1)).toBe(4100);
+    expect(wallLengthForSide(p, id, -1)).toBe(4300);
+  });
+
+  it("follows a neighbour's lopsided faces", () => {
+    let p = rect();
+    p = updateWall(p, wall(p, "B"), { offsets: { left: 200, right: 20 } });
+    // The inner face loses the thick side, the outer face gains the thin one.
+    expect(wallLengthForSide(p, wall(p, "A"), 1)).toBe(3950);
+    expect(wallLengthForSide(p, wall(p, "A"), -1)).toBe(4270);
+  });
+
+  it("converts a typed face length back to a centreline", () => {
+    const p = rect();
+    const id = wall(p, "A");
+    expect(centrelineForSideLength(p, id, 1, 4100)).toBe(4200);
+    expect(centrelineForSideLength(p, id, 1, 4000)).toBe(4100);
+    expect(centrelineForSideLength(p, id, -1, 4300)).toBe(4200);
+  });
+
+  it("round-trips: typing back what is displayed leaves the wall alone", async () => {
+    const { setWallLength } = await import("./geometry");
+    const p = rect();
+    const id = wall(p, "A");
+    for (const side of [1, 0, -1]) {
+      const shown = wallLengthForSide(p, id, side);
+      const next = setWallLength(p, id, centrelineForSideLength(p, id, side, shown));
+      expect(wallLengthForSide(next, id, side)).toBe(shown);
+    }
+  });
+
+  it("moves all three lines together, keeping the gaps between them", async () => {
+    const { setWallLength } = await import("./geometry");
+    const p = rect();
+    const id = wall(p, "A");
+    const gaps = [
+      wallLengthForSide(p, id, 0) - wallLengthForSide(p, id, 1),
+      wallLengthForSide(p, id, -1) - wallLengthForSide(p, id, 0),
+    ];
+
+    const next = setWallLength(p, id, centrelineForSideLength(p, id, 1, 3000));
+    expect(wallLengthForSide(next, id, 1)).toBe(3000);
+    // The other two followed by exactly the same amount.
+    expect([
+      wallLengthForSide(next, id, 0) - wallLengthForSide(next, id, 1),
+      wallLengthForSide(next, id, -1) - wallLengthForSide(next, id, 0),
+    ]).toEqual(gaps);
   });
 });

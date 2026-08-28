@@ -131,3 +131,28 @@ export function centrelineForMeasured(p: Project, id: WallId, measured: number):
   const overhead = wallLength(p, id) - wallMeasuredLength(p, id);
   return Math.max(1, Math.round(measured + overhead));
 }
+
+/** How long one of a wall's three lines is: +1 left face, 0 centreline, -1 right face. */
+export function wallLengthForSide(p: Project, id: WallId, side: number): number {
+  const span = wallSpanForSide(p, id, side);
+  return span.end - span.start;
+}
+
+/**
+ * The centreline length that makes one particular line come out at `target`.
+ *
+ * The three lines move together. Their differences are set by the corner angles and by
+ * the neighbouring walls' face offsets, not by how long this wall is, so lengthening the
+ * wall shifts all three by the same amount. Typing a length therefore says which line
+ * you measured; it cannot set one line while pinning another. To change the gap between
+ * them, change the corner or the neighbour's faces.
+ */
+export function centrelineForSideLength(
+  p: Project,
+  id: WallId,
+  side: number,
+  target: number,
+): number {
+  const overhead = wallLength(p, id) - wallLengthForSide(p, id, side);
+  return Math.max(1, Math.round(target + overhead));
+}

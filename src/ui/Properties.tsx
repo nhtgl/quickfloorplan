@@ -5,9 +5,8 @@ import {
   wallHeight,
 } from "../model/geometry";
 import {
-  centrelineForMeasured,
-  projectMeasureFrom,
-  wallMeasuredLength,
+  centrelineForSideLength,
+  wallLengthForSide,
   wallMeasuredSpan,
 } from "../model/measure";
 import {
@@ -93,16 +92,7 @@ export function Properties() {
     return (
       <aside className="panel">
         <h2>Wall {wall.label}</h2>
-        <NumberField
-          label={LENGTH_LABEL[projectMeasureFrom(project)]}
-          {...num}
-          value={formatLength(wallMeasuredLength(project, wall.id), unit)}
-          onCommit={(v) =>
-            apply((p) =>
-              setWallLength(p, wall.id, centrelineForMeasured(p, wall.id, parseLength(v, unit))),
-            )
-          }
-        />
+        <LengthFields wall={wall} unit={unit} />
         {angle !== null && (
           <NumberField
             label="Angle from previous"
@@ -285,6 +275,55 @@ export function Properties() {
 }
 
 /**
+ * How long each of the wall's three lines is.
+ *
+ * All three can be typed, because which one you measured depends on which side of the
+ * wall you were standing. They move together: the gaps between them are set by the
+ * corners and the neighbouring walls' faces, so typing one shifts the other two by the
+ * same amount rather than stretching the wall out of shape.
+ */
+function LengthFields({ wall, unit }: { wall: Wall; unit: Unit }) {
+  const project = useStore((s) => s.project);
+  const apply = useStore((s) => s.apply);
+  const names = wallSideNames(project, wall.id);
+  const step = stepFor(unit);
+
+  const lines: { key: string; side: number; label: string }[] = [
+    { key: "left", side: 1, label: `${names.left} face` },
+    { key: "centre", side: 0, label: "Centreline" },
+    { key: "right", side: -1, label: `${names.right} face` },
+  ];
+
+  return (
+    <section className="lines" data-testid="wall-lengths">
+      <h3>Length</h3>
+      {lines.map(({ key, side, label }) => (
+        <NumberField
+          key={key}
+          label={label}
+          suffix={unit}
+          step={step}
+          value={formatLength(wallLengthForSide(project, wall.id, side), unit)}
+          onCommit={(v) =>
+            apply((p) =>
+              setWallLength(
+                p,
+                wall.id,
+                centrelineForSideLength(p, wall.id, side, parseLength(v, unit)),
+              ),
+            )
+          }
+        />
+      ))}
+      <p className="hint">
+        The three move together. To change the gap between them, adjust a corner or the
+        neighbouring wall's faces.
+      </p>
+    </section>
+  );
+}
+
+/**
  * The two faces of a wall, edited on their own. Moving one leaves the other where it is,
  * so correcting the thickness of a wall does not disturb a room already measured against
  * its other side.
@@ -298,12 +337,13 @@ function FaceFields({ wall, unit }: { wall: Wall; unit: Unit }) {
   return (
     <section className="faces" data-testid="wall-faces">
       <h3>
-        Faces <span className="count">{formatLength(wallThickness(wall), unit)} {unit} thick</span>
+        Thickness{" "}
+        <span className="count">{formatLength(wallThickness(wall), unit)} {unit} overall</span>
       </h3>
       {(["left", "right"] as const).map((side) => (
         <NumberField
           key={side}
-          label={`${names[side]} face`}
+          label={`${names[side]} side`}
           suffix={unit}
           step={step}
           value={formatLength(wall.offsets[side], unit)}
@@ -337,12 +377,6 @@ function NodePanel({ project, nodeId }: { project: Project; nodeId: string }) {
     </aside>
   );
 }
-
-const LENGTH_LABEL: Record<string, string> = {
-  inside: "Length (inside)",
-  centre: "Length (centre)",
-  outside: "Length (outside)",
-};
 
 const KIND_NAME: Record<OpeningKind, string> = {
   door: "Door",

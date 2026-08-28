@@ -1,4 +1,4 @@
-import { pointAlongWall, wallById, wallEnds } from "./geometry";
+import { loopSignedArea, pointAlongWall, wallById, wallEnds } from "./geometry";
 import { wallSpanForSide } from "./measure";
 import type { Point, Project, WallId } from "./types";
 import { offsetForSide } from "./walls";
@@ -80,8 +80,19 @@ export function wallSideNames(p: Project, id: WallId): { left: string; right: st
     (side >= 0 ? names.left : names.right).push(room.name);
   }
 
+  // With no room against a side, say which way it faces. A wall in a closed run has an
+  // inside and an outside; a loose one only has a left and a right. The two must differ,
+  // or the panel would offer two fields with the same name.
+  const area = loopSignedArea(p, id);
+  const fallback =
+    area === null || area === 0
+      ? { left: "Left", right: "Right" }
+      : area > 0
+        ? { left: "Inside", right: "Outside" }
+        : { left: "Outside", right: "Inside" };
+
   return {
-    left: names.left[0] ?? "Other side",
-    right: names.right[0] ?? "Other side",
+    left: names.left[0] ?? fallback.left,
+    right: names.right[0] ?? fallback.right,
   };
 }

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import App from "../App";
 import { emptyProject } from "../model/factory";
 import { loopGap, wallLength } from "../model/geometry";
-import { wallMeasuredLength } from "../model/measure";
+import { wallLengthForSide, wallMeasuredLength } from "../model/measure";
 import { addPhoto, makePhoto } from "../model/photos";
 import { loopNodeIds, loopWallIds, moveLoop } from "../model/loops";
 import { addOpeningAtOffset, updateOpening } from "../model/ops";
@@ -72,7 +72,7 @@ describe("editing a wall by typing", () => {
     const wallId = useStore.getState().project.walls[0].id;
     act(() => useStore.getState().select({ kind: "wall", id: wallId }));
 
-    const input = await screen.findByLabelText(/Length/);
+    const input = await screen.findByLabelText("Centreline");
     await userEvent.clear(input);
     await userEvent.type(input, "420");
     fireEvent.blur(input);
@@ -235,7 +235,7 @@ describe("units", () => {
     const wallId = useStore.getState().project.walls[0].id;
     act(() => useStore.getState().select({ kind: "wall", id: wallId }));
     // The length field now reads and writes metres.
-    const input = await screen.findByLabelText(/Length/);
+    const input = await screen.findByLabelText("Centreline");
     await userEvent.clear(input);
     await userEvent.type(input, "3.15");
     fireEvent.blur(input);
@@ -257,13 +257,13 @@ describe("measuring from inside or outside", () => {
     const wallId = useStore.getState().project.walls[0].id;
     act(() => useStore.getState().select({ kind: "wall", id: wallId }));
 
-    const input = await screen.findByLabelText(/Length \(inside\)/);
+    const input = await screen.findByLabelText("Inside face");
     await userEvent.clear(input);
     await userEvent.type(input, "410");
     fireEvent.blur(input);
 
     const p = useStore.getState().project;
-    // Typing the inside measurement leaves a centreline 100mm longer, one wall thickness.
+    // That face is the inside of this room, so the centreline is a thickness longer.
     expect(wallLength(p, wallId)).toBe(4200);
     expect(wallMeasuredLength(p, wallId)).toBe(4100);
   });
@@ -279,7 +279,8 @@ describe("measuring from inside or outside", () => {
     await userEvent.selectOptions(screen.getByLabelText("Measure walls from"), "outside");
     const wallId = useStore.getState().project.walls[0].id;
     act(() => useStore.getState().select({ kind: "wall", id: wallId }));
-    expect(await screen.findByLabelText(/Length \(outside\)/)).toBeInTheDocument();
+    // Every line is offered by name, whichever the project measures from.
+    expect(await screen.findByLabelText("Centreline")).toBeInTheDocument();
   });
 });
 
@@ -1075,15 +1076,20 @@ describe("editing a wall's two faces", () => {
   it("offers a field per face, named after what is on that side", async () => {
     await aRoomWithName();
     expect(await screen.findByTestId("wall-faces")).toBeInTheDocument();
+    // A length for each of the wall's three lines...
     expect(screen.getByLabelText("Kitchen face")).toBeInTheDocument();
-    expect(screen.getByLabelText("Other side face")).toBeInTheDocument();
+    expect(screen.getByLabelText("Centreline")).toBeInTheDocument();
+    expect(screen.getByLabelText("Outside face")).toBeInTheDocument();
+    // ...and a face offset for each side.
+    expect(screen.getByLabelText("Kitchen side")).toBeInTheDocument();
+    expect(screen.getByLabelText("Outside side")).toBeInTheDocument();
   });
 
   it("moves one face without touching the other", async () => {
     const wallId = await aRoomWithName();
     const before = useStore.getState().project.walls.find((w) => w.id === wallId)!.offsets;
 
-    const field = await screen.findByLabelText("Kitchen face");
+    const field = await screen.findByLabelText("Kitchen side");
     await userEvent.clear(field);
     await userEvent.type(field, "25");
     fireEvent.blur(field);
@@ -1095,18 +1101,18 @@ describe("editing a wall's two faces", () => {
 
   it("shows the resulting thickness as the two faces together", async () => {
     const wallId = await aRoomWithName();
-    const field = await screen.findByLabelText("Kitchen face");
+    const field = await screen.findByLabelText("Kitchen side");
     await userEvent.clear(field);
     await userEvent.type(field, "25");
     fireEvent.blur(field);
 
     act(() => useStore.getState().select({ kind: "wall", id: wallId }));
-    expect(await screen.findByTestId("wall-faces")).toHaveTextContent("30 cm thick");
+    expect(await screen.findByTestId("wall-faces")).toHaveTextContent("30 cm overall");
   });
 
   it("refuses to put a face behind the centreline", async () => {
     const wallId = await aRoomWithName();
-    const field = await screen.findByLabelText("Kitchen face");
+    const field = await screen.findByLabelText("Kitchen side");
     await userEvent.clear(field);
     await userEvent.type(field, "-15");
     fireEvent.blur(field);
@@ -1114,5 +1120,62 @@ describe("editing a wall's two faces", () => {
     expect(
       useStore.getState().project.walls.find((w) => w.id === wallId)!.offsets.left,
     ).toBe(0);
+  });
+});
+
+describe("editing a wall's lengths", () => {
+  async function selectedWall() {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+    await userEvent.type(screen.getByTestId("room-name-input"), "Study");
+    await userEvent.type(screen.getByTestId("measurements-input"), "400,90,300,90,400,90,300,90");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    const id = useStore.getState().project.walls[0].id;
+    act(() => useStore.getState().select({ kind: "wall", id }));
+    return id;
+  }
+
+  it("offers a length for each of the wall's three lines", async () => {
+    await selectedWall();
+    expect(await screen.findByTestId("wall-lengths")).toBeInTheDocument();
+    expect(screen.getByLabelText("Study face")).toBeInTheDocument();
+    expect(screen.getByLabelText("Centreline")).toBeInTheDocument();
+    expect(screen.getByLabelText("Outside face")).toBeInTheDocument();
+  });
+
+  it("takes a length typed against the inside face", async () => {
+    const id = await selectedWall();
+    const field = await screen.findByLabelText("Study face");
+    await userEvent.clear(field);
+    await userEvent.type(field, "350");
+    fireEvent.blur(field);
+
+    const p = useStore.getState().project;
+    expect(wallLengthForSide(p, id, 1)).toBe(3500);
+  });
+
+  it("takes a length typed against the outside face just the same", async () => {
+    const id = await selectedWall();
+    const field = await screen.findByLabelText("Outside face");
+    await userEvent.clear(field);
+    await userEvent.type(field, "450");
+    fireEvent.blur(field);
+
+    expect(wallLengthForSide(useStore.getState().project, id, -1)).toBe(4500);
+  });
+
+  it("shifts the other two lines by the same amount, keeping the wall square", async () => {
+    const id = await selectedWall();
+    const before = [1, 0, -1].map((s) => wallLengthForSide(useStore.getState().project, id, s));
+
+    const field = await screen.findByLabelText("Study face");
+    await userEvent.clear(field);
+    await userEvent.type(field, "350");
+    fireEvent.blur(field);
+
+    const after = [1, 0, -1].map((s) => wallLengthForSide(useStore.getState().project, id, s));
+    const shifts = new Set(after.map((v, i) => v - before[i]));
+    expect(shifts.size).toBe(1);
   });
 });
