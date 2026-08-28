@@ -24,11 +24,20 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      # Tries to turn Pages on by itself. Some repositories will not let a workflow
+      # token do that, so a failure here is reported rather than silently fatal, and
+      # the next step says exactly which setting to change.
+      - id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
         with:
-          # Turn Pages on the first time this runs, rather than needing a visit to
-          # the repository settings.
           enablement: true
+
+      - name: Explain what to do if Pages is not enabled
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::error title=GitHub Pages is not enabled::Open Settings -> Pages on this repository and set 'Build and deployment' -> Source to 'GitHub Actions', then re-run this workflow. The workflow token was not allowed to switch it on by itself."
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
