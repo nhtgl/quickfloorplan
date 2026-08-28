@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import { chainOfWalls, emptyProject } from "../model/factory";
+import { loopCentroid, wallEnds } from "../model/geometry";
 import { newId } from "../model/ids";
 import { ElevationSvg } from "./ElevationSvg";
 import { PlanSvg } from "./PlanSvg";
@@ -243,5 +244,45 @@ describe("ElevationSvg", () => {
       (n) => n.textContent,
     );
     expect(labels.some((l) => l?.startsWith("sill"))).toBe(false);
+  });
+});
+
+describe("dimension placement with more than one room", () => {
+  it("pushes each wall's dimension away from its own loop, not the whole plan", () => {
+    // Two separate rectangles side by side. The point between them is on the wrong side
+    // of half the walls, so a whole-plan centroid would draw dimensions inside a room.
+    let p = chainOfWalls(emptyProject("Two"), RECT, true);
+    p = chainOfWalls(
+      p,
+      [
+        { x: 20_000, y: 0 },
+        { x: 24_000, y: 0 },
+        { x: 24_000, y: 3000 },
+        { x: 20_000, y: 3000 },
+      ],
+      true,
+    );
+    p = { ...p, measureFrom: "centre" };
+
+    const { container } = render(<PlanSvg project={p} width={900} height={600} />);
+    const labels = [...container.querySelectorAll('[data-testid="dim"]')];
+
+    // For every wall, the dimension line must sit outside the loop it belongs to.
+    for (const wall of p.walls) {
+      const centre = loopCentroid(p, wall.id)!;
+      const { a, b } = wallEnds(p, wall.id);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      // Distance from the loop centre to the wall, versus to its dimension line.
+      const toWall = Math.hypot(mid.x - centre.x, mid.y - centre.y);
+      // The label nearest this wall's midpoint is its own.
+      const line = labels
+        .map((g) => g.querySelector("text")!)
+        .map((t) => ({ x: Number(t.getAttribute("x")), y: Number(t.getAttribute("y")) }))
+        .sort(
+          (u, v) =>
+            Math.hypot(u.x - mid.x, u.y - mid.y) - Math.hypot(v.x - mid.x, v.y - mid.y),
+        )[0];
+      expect(Math.hypot(line.x - centre.x, line.y - centre.y)).toBeGreaterThan(toWall);
+    }
   });
 });

@@ -19,6 +19,12 @@ type State = {
   future: Project[];
   tool: Tool;
   selection: Selection;
+  /**
+   * Bumped to ask the canvas to fit the plan in view. Work added off-screen — a room
+   * built from typed sizes lands clear of everything already drawn — otherwise looks
+   * like nothing happened at all.
+   */
+  fitSignal: number;
   apply: (fn: (p: Project) => Project) => void;
   /** Push the current project onto the undo stack without changing it. */
   beginHistoryStep: () => void;
@@ -28,6 +34,7 @@ type State = {
   undo: () => void;
   redo: () => void;
   setTool: (t: Tool) => void;
+  requestFit: () => void;
   select: (s: Selection) => void;
 };
 
@@ -37,6 +44,7 @@ export const useStore = create<State>((set) => ({
   future: [],
   tool: "wall",
   selection: { kind: "none" },
+  fitSignal: 0,
 
   apply: (fn) =>
     set((s) => {
@@ -84,5 +92,6 @@ export const useStore = create<State>((set) => ({
     }),
 
   setTool: (tool) => set({ tool, selection: { kind: "none" } }),
+  requestFit: () => set((s) => ({ fitSignal: s.fitSignal + 1 })),
   select: (selection) => set({ selection }),
 }));

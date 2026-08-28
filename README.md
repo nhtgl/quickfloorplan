@@ -29,6 +29,13 @@ position and size, so you can find and edit one without hunting for its symbol o
 and add or remove them from there. **Door**, **Window** and **Opening** also place a fitting
 on whichever wall you click. **Room** outlines an area.
 
+**Room from sizes…** builds a whole room from numbers you type. Enter each wall and the turn
+after it — `250, 90, 100, 90, 250, 90, 100, 90` is a 250 wall, a quarter turn, a 100 wall, and
+so on round. A negative turn goes the other way, for a room that steps back on itself, and
+ticking *every corner is square* lets you type lengths alone. A live preview shows the shape
+before anything is added, says whether it closes, and reports the floor area. Lengths are read
+as whatever the Measure control says, so typed inside dimensions come out as inside dimensions.
+
 Measurements are in **centimetres** by default, which is how a tape gets read and written
 down. The Units control in the toolbar switches the whole project to metres. Room areas stay
 in m² either way, because a room in square centimetres is a six-digit number nobody can read.

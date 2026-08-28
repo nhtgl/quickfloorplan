@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  loopCentroid,
   loopGap,
   nodeById,
   pointAlongWall,
@@ -237,11 +238,12 @@ export function PlanSvg(props: PlanSvgProps) {
           const { a, b } = wallEnds(p, w.id);
           const span = wallMeasuredSpan(p, w.id);
           const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-          // Push the dimensions to whichever side faces away from the plan's middle.
+          // Push the dimensions to the side facing away from the room this wall encloses,
+          // falling back to the whole plan for a wall that encloses nothing.
+          const away = loopCentroid(p, w.id) ?? planCentre;
           const nx = -(b.y - a.y);
           const ny = b.x - a.x;
-          const outward =
-            (mid.x - planCentre.x) * nx + (mid.y - planCentre.y) * ny >= 0 ? 1 : -1;
+          const outward = (mid.x - away.x) * nx + (mid.y - away.y) * ny >= 0 ? 1 : -1;
           const chain = wallDimensionChain(p, w.id);
           const hasOpenings = chain.some((c) => c.kind === "opening");
 

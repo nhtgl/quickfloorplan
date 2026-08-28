@@ -477,3 +477,119 @@ describe("dragging a corner", () => {
     expect(nodeAt(0).x).toBe(before.x);
   });
 });
+
+describe("room from typed measurements", () => {
+  async function openDialog() {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+    return screen.getByRole("dialog", { name: "Create a room from measurements" });
+  }
+
+  it("builds a closed room from alternating lengths and turns", async () => {
+    await openDialog();
+    await userEvent.type(
+      screen.getByLabelText("Measurements"),
+      "250,90,100,90,250,90,100,90",
+    );
+    expect(screen.getByTestId("measurement-readout")).toHaveTextContent("Closes exactly");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    const p = useStore.getState().project;
+    expect(p.walls).toHaveLength(4);
+    expect(p.rooms).toHaveLength(1);
+    expect(loopGap(p, p.walls[0].id)).toBe(0);
+  });
+
+  it("makes the inside faces match what was typed", async () => {
+    await openDialog();
+    await userEvent.selectOptions(screen.getByLabelText("Measure walls from"), "inside");
+    await userEvent.type(
+      screen.getByLabelText("Measurements"),
+      "250,90,100,90,250,90,100,90",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    const p = useStore.getState().project;
+    expect(p.walls.map((w) => wallMeasuredLength(p, w.id))).toEqual([2500, 1000, 2500, 1000]);
+  });
+
+  it("reads lengths only when told every corner is square", async () => {
+    await openDialog();
+    await userEvent.click(screen.getByLabelText("Every corner is square"));
+    await userEvent.type(screen.getByLabelText("Measurements"), "250,100,250,100");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    expect(useStore.getState().project.walls).toHaveLength(4);
+  });
+
+  it("names the room and selects it so it can be edited straight away", async () => {
+    await openDialog();
+    await userEvent.type(screen.getByTestId("room-name-input"), "Kitchen");
+    await userEvent.type(
+      screen.getByLabelText("Measurements"),
+      "250,90,100,90,250,90,100,90",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    const p = useStore.getState().project;
+    expect(p.rooms[0].name).toBe("Kitchen");
+    expect(useStore.getState().selection).toEqual({ kind: "room", id: p.rooms[0].id });
+  });
+
+  it("says so when the numbers do not close, and adds walls without a room", async () => {
+    await openDialog();
+    await userEvent.type(
+      screen.getByLabelText("Measurements"),
+      "250,90,100,90,900,90,100,90",
+    );
+    expect(screen.getByTestId("measurement-readout")).toHaveTextContent("Misses its own start");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    const p = useStore.getState().project;
+    expect(p.walls).toHaveLength(4);
+    expect(p.rooms).toHaveLength(0);
+  });
+
+  it("explains a bad entry instead of drawing nothing", async () => {
+    await openDialog();
+    await userEvent.type(screen.getByLabelText("Measurements"), "250,90,wide");
+    expect(screen.getByTestId("measurement-error")).toHaveTextContent("wide");
+    expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+  });
+
+  it("leaves the project alone when cancelled", async () => {
+    await openDialog();
+    await userEvent.type(
+      screen.getByLabelText("Measurements"),
+      "250,90,100,90,250,90,100,90",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(useStore.getState().project.walls).toHaveLength(0);
+  });
+
+  it("is a single undo step", async () => {
+    await openDialog();
+    await userEvent.type(
+      screen.getByLabelText("Measurements"),
+      "250,90,100,90,250,90,100,90",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    act(() => useStore.getState().undo());
+    expect(useStore.getState().project.walls).toHaveLength(0);
+  });
+});
+
+describe("bringing new work into view", () => {
+  it("asks the canvas to refit after building a room off to the side", async () => {
+    render(<App />);
+    const before = useStore.getState().fitSignal;
+    await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+    await userEvent.type(
+      screen.getByTestId("measurements-input"),
+      "250,90,100,90,250,90,100,90",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(useStore.getState().fitSignal).toBeGreaterThan(before);
+  });
+});

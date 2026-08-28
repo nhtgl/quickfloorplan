@@ -138,6 +138,27 @@ await page.screenshot({ path: join(OUT, "align-guide.png") });
 await page.keyboard.press("Escape");
 await page.getByRole("button", { name: "Select" }).click();
 
+// Build a room by typing measurements, and look at the live preview.
+await page.getByRole("button", { name: "Room from sizes…" }).click();
+await page.getByTestId("measurements-input").fill("250,90,100,90,250,90,100,90");
+await page.waitForTimeout(150);
+const readout = await page.getByTestId("measurement-readout").textContent();
+await page.screenshot({ path: join(OUT, "measurements-dialog.png") });
+const wallsBefore = await page.locator('.stage [data-testid="wall"]').count();
+await page.getByRole("button", { name: "Create" }).click();
+await page.waitForTimeout(150);
+const wallsAfter = await page.locator('.stage [data-testid="wall"]').count();
+const typedRoomArea = await page
+  .locator('.stage [data-testid="room-label"]')
+  .last()
+  .textContent();
+// The new room lands clear of existing work, so the view must refit to show it.
+const typedRoomVisible = await page
+  .locator('.stage [data-testid="room-fill"]')
+  .last()
+  .isVisible();
+await page.screenshot({ path: join(OUT, "typed-room.png") });
+
 const [download] = await Promise.all([
   page.waitForEvent("download", { timeout: 60000 }),
   page.getByRole("button", { name: "Export PDF" }).click(),
@@ -168,6 +189,10 @@ const checks = [
   ["setting-out chain marks each opening", chainSegs === 4],
   ["backspace takes back the last corner", beforeBackspace === 3 && afterBackspace === 2],
   ["an alignment guide appears when lining up with a corner", guideCount > 0],
+  ["typed measurements close exactly", (readout ?? "").includes("Closes exactly")],
+  ["creating adds four walls", wallsAfter - wallsBefore === 4],
+  ["typed room reports 2.5 m2 of floor", (typedRoomArea ?? "").includes("2.5 m²")],
+  ["the new room is brought into view", typedRoomVisible],
   ["no page or console errors", problems.length === 0],
 ];
 

@@ -22,6 +22,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const beginHistoryStep = useStore((s) => s.beginHistoryStep);
   const select = useStore((s) => s.select);
   const setTool = useStore((s) => s.setTool);
+  const fitSignal = useStore((s) => s.fitSignal);
 
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [freeAngle, setFreeAngle] = useState(false);
@@ -32,9 +33,10 @@ export function Canvas({ width, height }: { width: number; height: number }) {
 
   useEffect(() => {
     fit(project);
-    // Fit once on mount; afterwards the user's pan and zoom are theirs to keep.
+    // Fit on mount, and whenever something asks. Otherwise the user's pan and zoom are
+    // theirs to keep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fitSignal]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

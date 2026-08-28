@@ -256,3 +256,19 @@ export function loopSignedArea(p: Project, id: WallId): number | null {
   }
   return sum / 2;
 }
+
+/**
+ * Centre of the loop a wall belongs to, or null for a wall in an open run.
+ *
+ * Dimensions are pushed to whichever side of a wall faces away from this. Using the whole
+ * plan's centre instead breaks as soon as there are two separate rooms, because the point
+ * between them is on the wrong side of half the walls.
+ */
+export function loopCentroid(p: Project, id: WallId): Point | null {
+  if (loopSignedArea(p, id) === null) return null;
+  const chain = [id, ...chainFrom(p, id)];
+  const pts = chain.map((wid) => nodeById(p, wallById(p, wid).a));
+  if (pts.length === 0) return null;
+  const sum = pts.reduce((acc, n) => ({ x: acc.x + n.x, y: acc.y + n.y }), { x: 0, y: 0 });
+  return { x: sum.x / pts.length, y: sum.y / pts.length };
+}

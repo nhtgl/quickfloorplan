@@ -1,12 +1,14 @@
 import {
   loopSignedArea,
   nextWall,
+  pointAlongWall,
   previousWall,
   wallAngleDeg,
   wallById,
+  wallEnds,
   wallLength,
 } from "./geometry";
-import type { Project, WallId } from "./types";
+import type { Point, Project, WallId } from "./types";
 
 /**
  * Which faces a wall's stated length runs between.
@@ -41,14 +43,8 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
  */
 export function wallMeasuredSpan(p: Project, id: WallId): Span {
   const len = wallLength(p, id);
-  const mode = projectMeasureFrom(p);
-  if (mode === "centre") return { start: 0, end: len };
-
-  const area = loopSignedArea(p, id);
-  if (area === null || area === 0) return { start: 0, end: len };
-
-  const winding = area > 0 ? 1 : -1;
-  const faceSign = (mode === "inside" ? 1 : -1) * winding;
+  const faceSign = wallFaceSign(p, id);
+  if (faceSign === 0) return { start: 0, end: len };
   const half = wallById(p, id).thickness / 2;
 
   let start = 0;
@@ -74,6 +70,38 @@ export function wallMeasuredSpan(p: Project, id: WallId): Span {
   }
 
   return { start: Math.round(start), end: Math.round(end) };
+}
+
+/**
+ * Which way, and whether, a wall's face is offset from its centreline. Zero when
+ * measuring centrelines, or when the wall is not part of a closed run and so has no
+ * inside to speak of. Positive offsets toward the left of the wall's own direction.
+ */
+export function wallFaceSign(p: Project, id: WallId): number {
+  const mode = projectMeasureFrom(p);
+  if (mode === "centre") return 0;
+  const area = loopSignedArea(p, id);
+  if (area === null || area === 0) return 0;
+  return (mode === "inside" ? 1 : -1) * (area > 0 ? 1 : -1);
+}
+
+/**
+ * The corner where this wall's measured face meets the next wall's. Walking these round
+ * a closed run gives the polygon of the room the walls enclose.
+ */
+export function wallFaceCornerAfter(p: Project, id: WallId): Point {
+  const span = wallMeasuredSpan(p, id);
+  const on = pointAlongWall(p, id, span.end);
+  const faceSign = wallFaceSign(p, id);
+  if (faceSign === 0) return { x: Math.round(on.x), y: Math.round(on.y) };
+
+  const { a, b } = wallEnds(p, id);
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  // Left-hand normal of the wall's direction.
+  const nx = -(b.y - a.y) / len;
+  const ny = (b.x - a.x) / len;
+  const off = (faceSign * wallById(p, id).thickness) / 2;
+  return { x: Math.round(on.x + nx * off), y: Math.round(on.y + ny * off) };
 }
 
 export function wallMeasuredLength(p: Project, id: WallId): number {

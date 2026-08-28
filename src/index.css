@@ -163,3 +163,54 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 }
 .viewctl button { min-width: 32px; border: none; font-size: 14px; line-height: 1.2; }
 .viewctl button:hover { background: var(--chrome); }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 22, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+.modal {
+  background: var(--paper);
+  border-radius: 12px;
+  padding: 20px 22px;
+  width: 580px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+}
+.modal h2 { font-size: 15px; margin: 0 0 10px; }
+.modal code {
+  background: var(--chrome);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.field.stacked { display: block; }
+.field.stacked > span { display: block; margin-bottom: 5px; }
+.field.stacked input { width: 100%; }
+.field.checkbox { justify-content: flex-start; gap: 8px; }
+.field.checkbox input { width: auto; }
+.field.checkbox span { color: var(--ink); }
+.modal .row { display: flex; gap: 16px; }
+.modal .row .field { flex: 1; }
+
+.preview {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 12px 0 8px;
+  overflow: hidden;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+}
+.preview svg { max-width: 100%; height: auto; }
+.readout { font-size: 13px; color: var(--dim); margin: 0 0 14px; }
+.readout .alert { color: var(--alert); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
