@@ -293,3 +293,66 @@ describe("view controls", () => {
     expect(useStore.getState().project.walls).toHaveLength(0);
   });
 });
+
+describe("taking back a corner", () => {
+  const draftPoints = () => screen.queryAllByTestId("draft-point").length;
+
+  it("backspace removes the last corner placed", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    clickPlan(600, 400);
+    expect(draftPoints()).toBe(3);
+
+    fireEvent.keyDown(window, { key: "Backspace" });
+    expect(draftPoints()).toBe(2);
+
+    fireEvent.keyDown(window, { key: "Backspace" });
+    expect(draftPoints()).toBe(1);
+  });
+
+  it("lets a misplaced corner be replaced without starting over", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    clickPlan(600, 500); // too far down
+    fireEvent.keyDown(window, { key: "Backspace" });
+    clickPlan(600, 400);
+    clickPlan(200, 400);
+    clickPlan(200, 150);
+
+    const p = useStore.getState().project;
+    expect(p.walls).toHaveLength(4);
+    expect(loopGap(p, p.walls[0].id)).toBe(0);
+  });
+
+  it("does nothing when no corner has been placed", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    fireEvent.keyDown(window, { key: "Backspace" });
+    expect(draftPoints()).toBe(0);
+    expect(useStore.getState().project.walls).toHaveLength(0);
+  });
+
+  it("leaves a corner alone when backspace is pressed inside a field", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    expect(draftPoints()).toBe(2);
+
+    const nameField = screen.getByLabelText("Project name");
+    fireEvent.keyDown(nameField, { key: "Backspace" });
+    expect(draftPoints()).toBe(2);
+  });
+
+  it("does not fit the view when 'f' is typed into a field", async () => {
+    render(<App />);
+    const nameField = screen.getByLabelText("Project name");
+    await userEvent.clear(nameField);
+    await userEvent.type(nameField, "Flat f");
+    expect((nameField as HTMLInputElement).value).toBe("Flat f");
+  });
+});

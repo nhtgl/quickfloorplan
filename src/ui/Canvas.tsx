@@ -36,10 +36,20 @@ export function Canvas({ width, height }: { width: number; height: number }) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      // Never steal keys from a field the user is typing a measurement into.
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "SELECT") return;
+
       if (e.key === "Alt") setFreeAngle(true);
       if (e.key === "Escape") setDraft(EMPTY);
       if (e.key === "Enter" && draft.points.length >= 2) commitDraft();
       if (e.key.toLowerCase() === "f") fit(project);
+      if (e.key === "Backspace" || e.key === "Delete") {
+        if (draft.points.length === 0) return;
+        // Backspace navigates back in some browsers, so this has to be claimed.
+        e.preventDefault();
+        setDraft((d) => ({ ...d, points: d.points.slice(0, -1) }));
+      }
     };
     const up = (e: KeyboardEvent) => {
       if (e.key === "Alt") setFreeAngle(false);
@@ -143,6 +153,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
       {draft.points.map((p, i) => (
         <circle
           key={i}
+          data-testid="draft-point"
           cx={p.x}
           cy={p.y}
           r={4 * viewport.mmPerPx}

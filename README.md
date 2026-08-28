@@ -17,8 +17,9 @@ npm run verify   # builds, then drives the real app in Chrome and checks the PDF
 ## Using it
 
 Pick the **Wall** tool and click corner to corner. Lengths snap to 15° increments and to
-existing corners; hold **Alt** to draw at a free angle. Click the first corner to close a
-loop, or press **Enter** to finish an open run.
+existing corners; hold **Alt** to draw at a free angle. **Backspace** takes back the last
+corner if you misplace one, **Enter** finishes an open run, and clicking the first corner
+closes a loop. **Escape** abandons the run.
 
 Select any wall to type its exact length, its angle to the previous wall, its thickness and
 a height override. The same panel lists every door, window and opening in that wall with its
@@ -44,7 +45,7 @@ Zoom and fit buttons sit at the bottom right of the canvas. The **Pan** tool dra
 and shift-drag or middle-drag pans with any tool selected.
 
 Keys: `V` select, `H` pan, `W` wall, `D` door, `N` window, `P` opening, `R` room, `F` fit to
-view, `Cmd/Ctrl+Z` undo. The wheel zooms.
+view, `Backspace` take back a corner, `Cmd/Ctrl+Z` undo. The wheel zooms.
 
 Projects are `.floorplan.json` files on your disk. The app also autosaves to the browser so
 a refresh never loses work, but the file is the thing you own and share.

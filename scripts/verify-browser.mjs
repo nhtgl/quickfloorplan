@@ -108,6 +108,19 @@ const zoomIn = await page.getByRole("button", { name: "Zoom in" }).count();
 const fitBtn = await page.getByRole("button", { name: "Fit plan to view" }).count();
 const panTool = await page.getByRole("button", { name: "Pan" }).count();
 
+// Backspace takes back the last corner while drawing.
+// "Wall" would also match the panel's "Delete wall" button.
+await page.getByRole("button", { name: "Wall", exact: true }).click();
+const svgBox = await page.locator('[data-testid="plan-svg"]').boundingBox();
+for (const [dx, dy] of [[0.3, 0.3], [0.5, 0.3], [0.5, 0.5]]) {
+  await page.mouse.click(svgBox.x + svgBox.width * dx, svgBox.y + svgBox.height * dy);
+}
+const beforeBackspace = await page.locator('[data-testid="draft-point"]').count();
+await page.keyboard.press("Backspace");
+const afterBackspace = await page.locator('[data-testid="draft-point"]').count();
+await page.keyboard.press("Escape");
+await page.getByRole("button", { name: "Select" }).click();
+
 const [download] = await Promise.all([
   page.waitForEvent("download", { timeout: 60000 }),
   page.getByRole("button", { name: "Export PDF" }).click(),
@@ -136,6 +149,7 @@ const checks = [
   ["dimensions read in centimetres", !dimLabels.some((t) => t.includes(" m"))],
   ["chain sums to the inside length", chainSum === 508],
   ["setting-out chain marks each opening", chainSegs === 4],
+  ["backspace takes back the last corner", beforeBackspace === 3 && afterBackspace === 2],
   ["no page or console errors", problems.length === 0],
 ];
 

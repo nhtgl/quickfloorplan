@@ -75,7 +75,8 @@ export function Properties() {
         <h2>Nothing selected</h2>
         <p className="hint">
           Pick the wall tool and click corner to corner. Hold Alt to break the 15° snap.
-          Press Enter to finish a run, or click the first corner to close it.
+          Backspace takes back the last corner, Enter finishes a run, and clicking the first
+          corner closes it.
         </p>
       </aside>
     );
