@@ -26,6 +26,10 @@ position and size, so you can find and edit one without hunting for its symbol o
 and add or remove them from there. **Door**, **Window** and **Opening** also place a fitting
 on whichever wall you click. **Room** outlines an area.
 
+Measurements are in **centimetres** by default, which is how a tape gets read and written
+down. The Units control in the toolbar switches the whole project to metres. Room areas stay
+in m² either way, because a room in square centimetres is a six-digit number nobody can read.
+
 Zoom and fit buttons sit at the bottom right of the canvas. The **Pan** tool drags the view,
 and shift-drag or middle-drag pans with any tool selected.
 
@@ -59,8 +63,15 @@ refuses to save until everything is perfect is a tool people abandon.
 
 Page 1 is the plan: every wall dimensioned and lettered, rooms tinted with names and areas,
 door swings drawn. Then one page per wall, titled with the rooms it faces ("Wall C — Kitchen
-/ Hall"), showing that wall face on with each opening dimensioned — position along the wall,
-width, height, and sill height where there is one.
+/ Hall"), showing that wall face on with each opening's height and sill.
+
+Any wall with an opening in it carries a **setting-out chain**: corner to the first opening,
+the opening itself, the solid stretch to the next, and so on to the far corner, with the
+overall length outside it. The segments tile the wall end to end, so the chain adds up to the
+overall — which is what lets someone check it against a tape on site. Openings are picked out
+in blue. Overlapping openings are merged into one segment rather than listed separately: a
+chain that does not add up is worse than no chain, and the overlap is already flagged as a
+warning.
 
 Pages are scaled to fit, not drawn at 1:50, so the footer says so. Read the numbers, don't
 measure the printout.

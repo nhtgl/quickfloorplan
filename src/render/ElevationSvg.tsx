@@ -1,7 +1,8 @@
 import { wallById, wallHeight, wallLength } from "../model/geometry";
-import { openingRect } from "../model/openings";
+import { projectUnit } from "../model/factory";
+import { openingRect, wallDimensionChain } from "../model/openings";
 import type { Project, WallId } from "../model/types";
-import { mmToM } from "../model/units";
+import { formatLengthWithUnit } from "../model/units";
 import { DimLine } from "./dimensions";
 import { fitViewBox } from "./bounds";
 import { ACCENT, ALERT, DIM, INK, PAPER, WALL } from "./theme";
@@ -34,6 +35,8 @@ export function ElevationSvg(props: ElevationSvgProps) {
   const len = wallLength(p, wallId);
   const h = wallHeight(p, wallId);
   const openings = p.openings.filter((o) => o.wallId === wallId);
+  const unit = projectUnit(p);
+  const chain = wallDimensionChain(p, wallId);
 
   const { viewBox, mmPerPx } = fitViewBox(
     { minX: 0, minY: -h, maxX: len, maxY: 0 },
@@ -97,19 +100,9 @@ export function ElevationSvg(props: ElevationSvgProps) {
               {KIND_LABEL[o.kind]}
             </text>
             <DimLine
-              from={{ x: r.x, y: up(r.y + r.h) }}
-              to={{ x: r.x + r.w, y: up(r.y + r.h) }}
-              label={`${mmToM(r.w)} m`}
-              // Inside the opening's top edge: the gap between an opening and the top of
-              // the wall is often only a few centimetres, and a width label placed out
-              // there collides with the wall outline.
-              offset={18 * mmPerPx}
-              mmPerPx={mmPerPx}
-            />
-            <DimLine
               from={{ x: r.x + r.w, y: up(r.y) }}
               to={{ x: r.x + r.w, y: up(r.y + r.h) }}
-              label={`${mmToM(r.h)} m`}
+              label={formatLengthWithUnit(r.h, unit)}
               offset={14 * mmPerPx}
               mmPerPx={mmPerPx}
             />
@@ -117,40 +110,49 @@ export function ElevationSvg(props: ElevationSvgProps) {
               <DimLine
                 from={{ x: r.x, y: up(0) }}
                 to={{ x: r.x, y: up(r.y) }}
-                label={`sill ${mmToM(r.y)} m`}
+                label={`sill ${formatLengthWithUnit(r.y, unit)}`}
                 offset={-20 * mmPerPx}
                 mmPerPx={mmPerPx}
               />
             )}
-            <DimLine
-              from={{ x: 0, y: up(0) }}
-              to={{ x: r.x, y: up(0) }}
-              label={mmToM(r.x)}
-              offset={26 * mmPerPx}
-              mmPerPx={mmPerPx}
-            />
           </g>
         );
       })}
 
+      {/* Setting-out chain: corner, opening, solid, opening, corner — tiling the wall. */}
+      {chain.length > 1 &&
+        chain.map((seg) => (
+          <DimLine
+            key={seg.start}
+            data-kind={seg.kind}
+            from={{ x: seg.start, y: up(0) }}
+            to={{ x: seg.end, y: up(0) }}
+            label={formatLengthWithUnit(Math.round(seg.end - seg.start), unit)}
+            offset={26 * mmPerPx}
+            mmPerPx={mmPerPx}
+            color={seg.kind === "opening" ? ACCENT : undefined}
+          />
+        ))}
+
+      {/* Overall length outside the chain. */}
       <DimLine
         from={{ x: 0, y: up(0) }}
         to={{ x: len, y: up(0) }}
-        label={`${mmToM(len)} m`}
-        offset={62 * mmPerPx}
+        label={formatLengthWithUnit(len, unit)}
+        offset={(chain.length > 1 ? 62 : 26) * mmPerPx}
         mmPerPx={mmPerPx}
       />
       <DimLine
         from={{ x: 0, y: up(h) }}
         to={{ x: 0, y: up(0) }}
-        label={`${mmToM(h)} m`}
+        label={formatLengthWithUnit(h, unit)}
         offset={40 * mmPerPx}
         mmPerPx={mmPerPx}
       />
       <text
         data-testid="floor-note"
         x={len / 2}
-        y={up(0) + 96 * mmPerPx}
+        y={up(0) + (chain.length > 1 ? 96 : 60) * mmPerPx}
         fill={INK}
         fontSize={10 * mmPerPx}
         fontFamily="Helvetica, Arial, sans-serif"

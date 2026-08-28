@@ -28,13 +28,52 @@ describe("PlanSvg", () => {
     ]);
   });
 
-  it("dimensions every wall in metres", () => {
+  it("dimensions every wall in the project's unit", () => {
     const { container } = render(<PlanSvg project={base()} width={800} height={600} />);
     const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
       (n) => n.textContent,
     );
+    expect(labels).toContain("420 cm");
+    expect(labels).toContain("310 cm");
+  });
+
+  it("switches to metres when the project says so", () => {
+    const p = { ...base(), units: "m" as const };
+    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
+    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
+      (n) => n.textContent,
+    );
     expect(labels).toContain("4.20 m");
-    expect(labels).toContain("3.10 m");
+  });
+
+  it("draws a setting-out chain beside the overall length once a wall has an opening", () => {
+    const p = base();
+    p.openings = [
+      {
+        id: newId("o"),
+        wallId: p.walls[0].id,
+        kind: "window",
+        offset: 1500,
+        width: 1200,
+        height: 1400,
+        sill: 900,
+      },
+    ];
+    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
+    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
+      (n) => n.textContent,
+    );
+    // Corner to opening, the opening, opening to far corner, and the overall.
+    expect(labels).toContain("90 cm");
+    expect(labels).toContain("120 cm");
+    expect(labels).toContain("210 cm");
+    expect(labels).toContain("420 cm");
+  });
+
+  it("leaves a wall with no openings a single overall dimension", () => {
+    const { container } = render(<PlanSvg project={base()} width={800} height={600} />);
+    expect(container.querySelectorAll('[data-kind="opening"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-kind="solid"]')).toHaveLength(0);
   });
 
   it("fills a room and states its name and area", () => {
@@ -148,10 +187,13 @@ describe("ElevationSvg", () => {
     const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
       (n) => n.textContent,
     );
-    expect(labels).toContain("4.20 m");
-    expect(labels).toContain("2.60 m");
-    expect(labels).toContain("sill 0.90 m");
-    expect(labels).toContain("1.20 m");
+    expect(labels).toContain("420 cm");
+    expect(labels).toContain("260 cm");
+    expect(labels).toContain("sill 90 cm");
+    // The chain carries the opening width and the solid runs either side of it.
+    expect(labels).toContain("120 cm");
+    expect(labels).toContain("90 cm");
+    expect(labels).toContain("210 cm");
   });
 
   it("omits the sill dimension for a door sitting on the floor", () => {

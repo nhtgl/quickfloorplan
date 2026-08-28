@@ -30,6 +30,7 @@ const base = `http://localhost:${server.address().port}`;
 const project = {
   schema: "quickfloorplan/1",
   name: "Verification Flat",
+  units: "cm",
   defaultWallHeight: 2600,
   nodes: [
     { id: "n1", x: 0, y: 0 },
@@ -94,6 +95,8 @@ await page.locator('[data-testid="wall"]').first().dispatchEvent("click");
 const openingRows = await page.locator('[data-testid="opening-row"]').allTextContents();
 await page.screenshot({ path: join(OUT, "wall-selected.png") });
 
+const dimLabels = await page.locator('[data-testid="dim-label"]').allTextContents();
+const chainSegs = await page.locator('[data-kind="opening"]').count();
 const zoomIn = await page.getByRole("button", { name: "Zoom in" }).count();
 const fitBtn = await page.getByRole("button", { name: "Fit plan to view" }).count();
 const panTool = await page.getByRole("button", { name: "Pan" }).count();
@@ -121,6 +124,8 @@ const checks = [
   ["PDF larger than 5kB", pdf.length > 5000],
   ["wall A panel lists its 2 windows", openingRows.length === 2 && openingRows.every((t) => t.includes("Window"))],
   ["zoom, fit and pan controls present", zoomIn === 1 && fitBtn === 1 && panTool === 1],
+  ["dimensions read in centimetres", dimLabels.includes("520 cm") && !dimLabels.some((t) => t.includes(" m"))],
+  ["setting-out chain marks each opening", chainSegs === 4],
   ["no page or console errors", problems.length === 0],
 ];
 

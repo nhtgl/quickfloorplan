@@ -66,9 +66,10 @@ describe("editing a wall by typing", () => {
 
     const input = await screen.findByLabelText(/Length/);
     await userEvent.clear(input);
-    await userEvent.type(input, "4.20");
+    await userEvent.type(input, "420");
     fireEvent.blur(input);
 
+    // Default unit is centimetres, so 420 typed means 4.20 m.
     expect(wallLength(useStore.getState().project, wallId)).toBe(4200);
   });
 });
@@ -207,6 +208,30 @@ describe("wall panel", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: /Delete window/i }));
     expect(useStore.getState().project.openings).toHaveLength(0);
+  });
+});
+
+describe("units", () => {
+  it("defaults to centimetres and switches the whole drawing to metres", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    expect(useStore.getState().project.units).toBe("cm");
+
+    await userEvent.selectOptions(screen.getByLabelText("Units"), "m");
+    expect(useStore.getState().project.units).toBe("m");
+
+    const wallId = useStore.getState().project.walls[0].id;
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+    // The length field now reads and writes metres.
+    const input = await screen.findByLabelText(/Length/);
+    await userEvent.clear(input);
+    await userEvent.type(input, "3.15");
+    fireEvent.blur(input);
+    expect(wallLength(useStore.getState().project, wallId)).toBe(3150);
   });
 });
 

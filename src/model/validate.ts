@@ -1,7 +1,9 @@
 import { openLoops, wallHeight, wallLength } from "./geometry";
 import { openingSpan } from "./openings";
 import { polygonSelfIntersects, roomsOverlap } from "./rooms";
+import { projectUnit } from "./factory";
 import type { Project } from "./types";
+import { formatLengthWithUnit } from "./units";
 
 export type WarningKind =
   | "opening-too-wide"
@@ -26,22 +28,24 @@ export type Warning = {
  */
 export function projectWarnings(p: Project): Warning[] {
   const out: Warning[] = [];
+  const unit = projectUnit(p);
+  const len = (mm: number) => formatLengthWithUnit(mm, unit);
 
   for (const wall of p.walls) {
-    const len = wallLength(p, wall.id);
+    const wallLen = wallLength(p, wall.id);
     const height = wallHeight(p, wall.id);
     const openings = p.openings.filter((o) => o.wallId === wall.id);
 
     for (const o of openings) {
-      if (o.width > len) {
+      if (o.width > wallLen) {
         out.push({
           kind: "opening-too-wide",
           targetIds: [o.id],
-          message: `Opening is ${(o.width / 1000).toFixed(2)} m wide but wall ${wall.label} is only ${(len / 1000).toFixed(2)} m.`,
+          message: `Opening is ${len(o.width)} wide but wall ${wall.label} is only ${len(wallLen)}.`,
         });
       } else {
         const [start, end] = openingSpan(p, o.id);
-        if (start < 0 || end > len) {
+        if (start < 0 || end > wallLen) {
           out.push({
             kind: "opening-past-end",
             targetIds: [o.id],
@@ -53,7 +57,7 @@ export function projectWarnings(p: Project): Warning[] {
         out.push({
           kind: "opening-too-tall",
           targetIds: [o.id],
-          message: `Opening reaches ${((o.sill + o.height) / 1000).toFixed(2)} m but wall ${wall.label} is ${(height / 1000).toFixed(2)} m high.`,
+          message: `Opening reaches ${len(o.sill + o.height)} but wall ${wall.label} is ${len(height)} high.`,
         });
       }
     }
@@ -79,7 +83,7 @@ export function projectWarnings(p: Project): Warning[] {
     out.push({
       kind: "loop-open",
       targetIds: [loop.nodeId, loop.partnerId],
-      message: `Loop is open by ${(loop.gap / 1000).toFixed(2)} m. Adjust another wall to close it.`,
+      message: `Loop is open by ${len(loop.gap)}. Adjust another wall to close it.`,
     });
   }
 

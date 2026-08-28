@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { emptyProject } from "../model/factory";
-import { mmToM, mToMm } from "../model/units";
+import { formatLength, parseLength, stepFor, type Unit } from "../model/units";
+import { projectUnit } from "../model/factory";
 import { openProject, saveProject } from "../file/io";
 import { exportPdf, pdfFileName } from "../export/pdf";
 import { useStore, type Tool } from "../state/store";
@@ -24,6 +25,7 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const [busy, setBusy] = useState(false);
+  const unit = projectUnit(project);
 
   async function doExport() {
     setBusy(true);
@@ -84,18 +86,33 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
       </label>
 
       <label className="field inline">
+        <span>Units</span>
+        <select
+          aria-label="Units"
+          value={unit}
+          onChange={(e) => apply((p) => ({ ...p, units: e.currentTarget.value as Unit }))}
+        >
+          <option value="cm">cm</option>
+          <option value="m">m</option>
+        </select>
+      </label>
+
+      <label className="field inline">
         <span>Ceiling</span>
         <input
           type="number"
           aria-label="Ceiling height"
-          step={0.01}
-          defaultValue={mmToM(project.defaultWallHeight)}
-          key={project.defaultWallHeight}
+          step={stepFor(unit)}
+          defaultValue={formatLength(project.defaultWallHeight, unit)}
+          key={`${project.defaultWallHeight}-${unit}`}
           onBlur={(e) =>
-            apply((p) => ({ ...p, defaultWallHeight: mToMm(Number(e.currentTarget.value)) }))
+            apply((p) => ({
+              ...p,
+              defaultWallHeight: parseLength(Number(e.currentTarget.value), unit),
+            }))
           }
         />
-        <em>m</em>
+        <em>{unit}</em>
       </label>
 
       <div className="actions">

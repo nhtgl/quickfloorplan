@@ -168,3 +168,50 @@ describe("labelOffsetAlongWall", () => {
     expect(labelOffsetAlongWall(p, p.walls[0].id)).toBe(2000);
   });
 });
+
+describe("wallDimensionChain", () => {
+  it("is a single run for a bare wall", async () => {
+    const { wallDimensionChain } = await import("./openings");
+    const p = wallProject();
+    expect(wallDimensionChain(p, p.walls[0].id)).toEqual([
+      { start: 0, end: 4200, kind: "solid", openingIds: [] },
+    ]);
+  });
+
+  it("reads corner, opening, corner and tiles the whole wall", async () => {
+    const { wallDimensionChain } = await import("./openings");
+    const { project } = withOpening(wallProject(), { offset: 1500, width: 1200 });
+    const chain = wallDimensionChain(project, project.walls[0].id);
+    expect(chain.map((c) => [c.kind, c.end - c.start])).toEqual([
+      ["solid", 900],
+      ["opening", 1200],
+      ["solid", 2100],
+    ]);
+    // The segments add up to the wall, which is what makes the chain checkable on site.
+    expect(chain.reduce((n, c) => n + (c.end - c.start), 0)).toBe(4200);
+  });
+
+  it("omits a zero-length run when an opening is flush with a corner", async () => {
+    const { wallDimensionChain } = await import("./openings");
+    const { project } = withOpening(wallProject(), { offset: 600, width: 1200 });
+    const chain = wallDimensionChain(project, project.walls[0].id);
+    expect(chain.map((c) => c.kind)).toEqual(["opening", "solid"]);
+  });
+
+  it("merges overlapping openings so the chain still adds up", async () => {
+    const { wallDimensionChain } = await import("./openings");
+    let p = wallProject();
+    p = withOpening(p, { offset: 1000, width: 1000 }).project;
+    p = withOpening(p, { offset: 1600, width: 1000 }).project;
+    const chain = wallDimensionChain(p, p.walls[0].id);
+    expect(chain.filter((c) => c.kind === "opening")).toHaveLength(1);
+    expect(chain.reduce((n, c) => n + (c.end - c.start), 0)).toBe(4200);
+  });
+
+  it("clamps an opening that runs past the end of its wall", async () => {
+    const { wallDimensionChain } = await import("./openings");
+    const { project } = withOpening(wallProject(), { offset: 4000, width: 1200 });
+    const chain = wallDimensionChain(project, project.walls[0].id);
+    expect(chain.reduce((n, c) => n + (c.end - c.start), 0)).toBe(4200);
+  });
+});

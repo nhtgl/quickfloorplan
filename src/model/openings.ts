@@ -100,3 +100,59 @@ export function labelOffsetAlongWall(p: Project, wallId: string): number {
   if (bestWidth <= 0) return len / 2;
   return (best[0] + best[1]) / 2;
 }
+
+export type ChainSegment = {
+  /** mm from wall end a */
+  start: number;
+  end: number;
+  kind: "solid" | "opening";
+  openingIds: string[];
+};
+
+/**
+ * The setting-out chain for a wall: corner to the first opening, the opening itself,
+ * the solid stretch to the next, and so on to the far corner. The segments tile the wall
+ * end to end, so they add up to its length — which is what makes the chain checkable on
+ * site with a tape.
+ *
+ * Openings that overlap are merged into one segment. Leaving them separate would make the
+ * chain sum to more than the wall, and a dimension chain that does not add up is worse
+ * than none. The overlap itself is already reported as a warning.
+ */
+export function wallDimensionChain(p: Project, wallId: string): ChainSegment[] {
+  const len = wallLength(p, wallId);
+  const clamp = (v: number) => Math.max(0, Math.min(len, v));
+
+  const spans = p.openings
+    .filter((o) => o.wallId === wallId)
+    .map((o) => ({
+      id: o.id,
+      start: clamp(o.offset - o.width / 2),
+      end: clamp(o.offset + o.width / 2),
+    }))
+    .filter((s) => s.end > s.start)
+    .sort((a, b) => a.start - b.start);
+
+  const merged: { start: number; end: number; ids: string[] }[] = [];
+  for (const s of spans) {
+    const last = merged[merged.length - 1];
+    if (last && s.start < last.end) {
+      last.end = Math.max(last.end, s.end);
+      last.ids.push(s.id);
+    } else {
+      merged.push({ start: s.start, end: s.end, ids: [s.id] });
+    }
+  }
+
+  const out: ChainSegment[] = [];
+  let cursor = 0;
+  for (const m of merged) {
+    if (m.start > cursor) {
+      out.push({ start: cursor, end: m.start, kind: "solid", openingIds: [] });
+    }
+    out.push({ start: m.start, end: m.end, kind: "opening", openingIds: m.ids });
+    cursor = m.end;
+  }
+  if (len > cursor) out.push({ start: cursor, end: len, kind: "solid", openingIds: [] });
+  return out;
+}

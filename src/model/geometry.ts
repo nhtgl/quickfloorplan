@@ -219,3 +219,13 @@ export function mergeOpenNode(p: Project, nodeId: NodeId): Project {
     updatedAt: new Date().toISOString(),
   };
 }
+
+/** A point a measured distance along a wall's centreline from end a. */
+export function pointAlongWall(p: Project, id: WallId, distance: number): Point {
+  const { a, b } = wallEnds(p, id);
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  return {
+    x: a.x + ((b.x - a.x) / len) * distance,
+    y: a.y + ((b.y - a.y) / len) * distance,
+  };
+}

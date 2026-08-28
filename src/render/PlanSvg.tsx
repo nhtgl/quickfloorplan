@@ -2,14 +2,21 @@ import type { ReactNode } from "react";
 import {
   loopGap,
   nodeById,
+  pointAlongWall,
   wallAngleDeg,
   wallEnds,
   wallLength,
 } from "../model/geometry";
-import { doorSwingArc, labelOffsetAlongWall, openingPlanSegment } from "../model/openings";
+import { projectUnit } from "../model/factory";
+import {
+  doorSwingArc,
+  labelOffsetAlongWall,
+  openingPlanSegment,
+  wallDimensionChain,
+} from "../model/openings";
 import { edgeHasWallBehind, roomArea } from "../model/rooms";
 import type { Point, Project } from "../model/types";
-import { formatDeg, mm2ToM2, mmToM } from "../model/units";
+import { formatArea, formatDeg, formatLengthWithUnit } from "../model/units";
 import { DimLine } from "./dimensions";
 import { fitViewBox, planBounds } from "./bounds";
 import { ACCENT, ALERT, DIM, INK, NOTIONAL, PAPER, WALL } from "./theme";
@@ -53,6 +60,7 @@ export function PlanSvg(props: PlanSvgProps) {
     alertIds = [],
   } = props;
 
+  const unit = projectUnit(p);
   const fitted = fitViewBox(planBounds(p), width, height);
   const viewBox = props.viewBox ?? fitted.viewBox;
   const mmPerPx = props.mmPerPx ?? fitted.mmPerPx;
@@ -130,7 +138,7 @@ export function PlanSvg(props: PlanSvgProps) {
                     fontFamily="Helvetica, Arial, sans-serif"
                     textAnchor="middle"
                   >
-                    {mm2ToM2(roomArea(room))} m²
+                    {formatArea(roomArea(room))} m²
                   </text>
                 </g>
               )}
@@ -226,20 +234,39 @@ export function PlanSvg(props: PlanSvgProps) {
         p.walls.map((w) => {
           const { a, b } = wallEnds(p, w.id);
           const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-          // Push the dimension to whichever side faces away from the plan's middle.
+          // Push the dimensions to whichever side faces away from the plan's middle.
           const nx = -(b.y - a.y);
           const ny = b.x - a.x;
           const outward =
             (mid.x - planCentre.x) * nx + (mid.y - planCentre.y) * ny >= 0 ? 1 : -1;
+          const chain = wallDimensionChain(p, w.id);
+          const hasOpenings = chain.some((c) => c.kind === "opening");
+
           return (
-            <DimLine
-              key={w.id}
-              from={{ x: a.x, y: a.y }}
-              to={{ x: b.x, y: b.y }}
-              label={`${mmToM(wallLength(p, w.id))} m`}
-              offset={outward * 22 * mmPerPx}
-              mmPerPx={mmPerPx}
-            />
+            <g key={`${w.id}-dims`}>
+              {/* Setting-out chain nearest the wall; it tiles the wall end to end. */}
+              {hasOpenings &&
+                chain.map((seg) => (
+                  <DimLine
+                    key={`${w.id}-${seg.start}`}
+                    data-kind={seg.kind}
+                    from={pointAlongWall(p, w.id, seg.start)}
+                    to={pointAlongWall(p, w.id, seg.end)}
+                    label={formatLengthWithUnit(Math.round(seg.end - seg.start), unit)}
+                    offset={outward * 22 * mmPerPx}
+                    mmPerPx={mmPerPx}
+                    color={seg.kind === "opening" ? ACCENT : undefined}
+                  />
+                ))}
+              {/* Overall length sits outside the chain, the way a builder reads it. */}
+              <DimLine
+                from={{ x: a.x, y: a.y }}
+                to={{ x: b.x, y: b.y }}
+                label={formatLengthWithUnit(wallLength(p, w.id), unit)}
+                offset={outward * (hasOpenings ? 52 : 22) * mmPerPx}
+                mmPerPx={mmPerPx}
+              />
+            </g>
           );
         })}
 
@@ -319,7 +346,10 @@ export function PlanSvg(props: PlanSvgProps) {
                 fontFamily="Helvetica, Arial, sans-serif"
                 textAnchor="middle"
               >
-                {`open ${mmToM(gap || Math.round(Math.hypot(n.x - partner.x, n.y - partner.y)))} m`}
+                {`open ${formatLengthWithUnit(
+                  gap || Math.round(Math.hypot(n.x - partner.x, n.y - partner.y)),
+                  unit,
+                )}`}
               </text>
             </g>
           );

@@ -10,13 +10,23 @@ type DimLineProps = {
   /** mm per rendered pixel, so text and strokes stay a constant visual size. */
   mmPerPx: number;
   color?: string;
+  /** Marks a chain segment as solid wall or opening, for tests and styling. */
+  "data-kind"?: string;
 };
 
 /**
  * A dimension line with extension lines and ticks, drawn parallel to from->to. Text is
  * kept upright: an upside-down measurement is unreadable on a printout.
  */
-export function DimLine({ from, to, label, offset, mmPerPx, color = DIM }: DimLineProps) {
+export function DimLine({
+  from,
+  to,
+  label,
+  offset,
+  mmPerPx,
+  color = DIM,
+  "data-kind": dataKind,
+}: DimLineProps) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.hypot(dx, dy);
@@ -36,7 +46,7 @@ export function DimLine({ from, to, label, offset, mmPerPx, color = DIM }: DimLi
   const font = 11 * mmPerPx;
 
   return (
-    <g>
+    <g data-testid="dim" data-kind={dataKind}>
       <line x1={from.x} y1={from.y} x2={a.x} y2={a.y} stroke={color} strokeWidth={stroke} />
       <line x1={to.x} y1={to.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={stroke} />
       <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={stroke} />

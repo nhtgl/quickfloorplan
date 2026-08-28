@@ -1,11 +1,13 @@
 import { newId, nextWallLabel } from "./ids";
 import { SCHEMA, type PlanNode, type Point, type Project, type Wall } from "./types";
+import { DEFAULT_UNIT, type Unit } from "./units";
 
 export function emptyProject(name = "Untitled"): Project {
   const now = new Date().toISOString();
   return {
     schema: SCHEMA,
     name,
+    units: DEFAULT_UNIT,
     defaultWallHeight: 2600,
     nodes: [],
     walls: [],
@@ -61,4 +63,9 @@ export function chainOfWalls(
     proj = addWall(proj, nodeIds[nodeIds.length - 1], nodeIds[0], thickness).project;
   }
   return proj;
+}
+
+/** A project's display unit, defaulting for files written before units existed. */
+export function projectUnit(p: Project): Unit {
+  return p.units ?? DEFAULT_UNIT;
 }

@@ -17,21 +17,22 @@ import {
 import { labelOffsetAlongWall } from "../model/openings";
 import { roomArea } from "../model/rooms";
 import type { Opening, OpeningKind, Project } from "../model/types";
-import { mm2ToM2, mmToM, mToMm } from "../model/units";
+import { formatArea, formatLength, parseLength, stepFor } from "../model/units";
+import { projectUnit } from "../model/factory";
 import { ROOM_TINTS } from "../render/theme";
 import { useStore } from "../state/store";
 
 function NumberField({
   label,
   value,
-  suffix = "m",
-  step = 0.01,
+  suffix,
+  step,
   onCommit,
 }: {
   label: string;
   value: string;
-  suffix?: string;
-  step?: number;
+  suffix: string;
+  step: number;
   onCommit: (v: number) => void;
 }) {
   return (
@@ -60,6 +61,8 @@ export function Properties() {
   const selection = useStore((s) => s.selection);
   const apply = useStore((s) => s.apply);
   const select = useStore((s) => s.select);
+  const unit = projectUnit(project);
+  const num = { suffix: unit, step: stepFor(unit) };
 
   if (selection.kind === "none") {
     return (
@@ -82,8 +85,9 @@ export function Properties() {
         <h2>Wall {wall.label}</h2>
         <NumberField
           label="Length"
-          value={mmToM(wallLength(project, wall.id))}
-          onCommit={(v) => apply((p) => setWallLength(p, wall.id, mToMm(v)))}
+          {...num}
+          value={formatLength(wallLength(project, wall.id), unit)}
+          onCommit={(v) => apply((p) => setWallLength(p, wall.id, parseLength(v, unit)))}
         />
         {angle !== null && (
           <NumberField
@@ -96,20 +100,22 @@ export function Properties() {
         )}
         <NumberField
           label="Thickness"
-          value={mmToM(wall.thickness)}
-          onCommit={(v) => apply((p) => updateWall(p, wall.id, { thickness: mToMm(v) }))}
+          {...num}
+          value={formatLength(wall.thickness, unit)}
+          onCommit={(v) => apply((p) => updateWall(p, wall.id, { thickness: parseLength(v, unit) }))}
         />
         <NumberField
           label="Height"
-          value={mmToM(wallHeight(project, wall.id))}
-          onCommit={(v) => apply((p) => updateWall(p, wall.id, { height: mToMm(v) }))}
+          {...num}
+          value={formatLength(wallHeight(project, wall.id), unit)}
+          onCommit={(v) => apply((p) => updateWall(p, wall.id, { height: parseLength(v, unit) }))}
         />
         {wall.height !== undefined && (
           <button
             className="link"
             onClick={() => apply((p) => updateWall(p, wall.id, { height: undefined }))}
           >
-            Use the project height ({mmToM(project.defaultWallHeight)} m)
+            Use the project height ({formatLength(project.defaultWallHeight, unit)} {unit})
           </button>
         )}
         <OpeningList wallId={wall.id} wallLabel={wall.label} />
@@ -159,16 +165,28 @@ export function Properties() {
         </label>
         <NumberField
           label={`From end ${wall.label} (to centre)`}
-          value={mmToM(o.offset)}
-          onCommit={(v) => patch({ offset: mToMm(v) })}
+          {...num}
+          value={formatLength(o.offset, unit)}
+          onCommit={(v) => patch({ offset: parseLength(v, unit) })}
         />
-        <NumberField label="Width" value={mmToM(o.width)} onCommit={(v) => patch({ width: mToMm(v) })} />
-        <NumberField label="Height" value={mmToM(o.height)} onCommit={(v) => patch({ height: mToMm(v) })} />
+        <NumberField
+          label="Width"
+          {...num}
+          value={formatLength(o.width, unit)}
+          onCommit={(v) => patch({ width: parseLength(v, unit) })}
+        />
+        <NumberField
+          label="Height"
+          {...num}
+          value={formatLength(o.height, unit)}
+          onCommit={(v) => patch({ height: parseLength(v, unit) })}
+        />
         {o.kind !== "door" && (
           <NumberField
             label="Sill above floor"
-            value={mmToM(o.sill)}
-            onCommit={(v) => patch({ sill: mToMm(v) })}
+            {...num}
+            value={formatLength(o.sill, unit)}
+            onCommit={(v) => patch({ sill: parseLength(v, unit) })}
           />
         )}
         {o.kind === "door" && (
@@ -223,7 +241,7 @@ export function Properties() {
         </label>
         <div className="field">
           <span>Area</span>
-          <strong>{mm2ToM2(roomArea(room))} m²</strong>
+          <strong>{formatArea(roomArea(room))} m²</strong>
         </div>
         <div className="field">
           <span>Tint</span>
@@ -288,6 +306,7 @@ function OpeningList({ wallId, wallLabel }: { wallId: string; wallLabel: string 
   const apply = useStore((s) => s.apply);
   const select = useStore((s) => s.select);
 
+  const unit = projectUnit(project);
   const openings = project.openings
     .filter((o) => o.wallId === wallId)
     .sort((a, b) => a.offset - b.offset);
@@ -320,8 +339,9 @@ function OpeningList({ wallId, wallLabel }: { wallId: string; wallLabel: string 
             >
               <strong>{KIND_NAME[o.kind]}</strong>
               <span>
-                {mmToM(o.offset)} m from {wallLabel} · {mmToM(o.width)} × {mmToM(o.height)} m
-                {o.sill > 0 ? ` · sill ${mmToM(o.sill)} m` : ""}
+                {formatLength(o.offset, unit)} {unit} from {wallLabel} ·{" "}
+                {formatLength(o.width, unit)} × {formatLength(o.height, unit)} {unit}
+                {o.sill > 0 ? ` · sill ${formatLength(o.sill, unit)} ${unit}` : ""}
               </span>
             </button>
             <button

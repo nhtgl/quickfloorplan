@@ -1,3 +1,5 @@
+import type { Unit } from "./units";
+
 export type NodeId = string;
 export type WallId = string;
 export type OpeningId = string;
@@ -60,6 +62,8 @@ export type Room = {
 export type Project = {
   schema: "quickfloorplan/1";
   name: string;
+  /** Display unit. Absent in older files, which read as centimetres. */
+  units?: Unit;
   /** mm */
   defaultWallHeight: number;
   nodes: PlanNode[];

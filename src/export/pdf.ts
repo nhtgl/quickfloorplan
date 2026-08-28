@@ -6,7 +6,9 @@ import { svg2pdf } from "svg2pdf.js";
 import { ElevationSvg } from "../render/ElevationSvg";
 import { PlanSvg } from "../render/PlanSvg";
 import { DIM, INK } from "../render/theme";
+import { projectUnit } from "../model/factory";
 import type { Project } from "../model/types";
+import { unitName } from "../model/units";
 import { elevationTitle } from "./pageTitles";
 
 // A4 landscape in points.
@@ -61,7 +63,7 @@ function chrome(doc: jsPDF, project: Project, title: string, page: number, total
   const date = new Date().toISOString().slice(0, 10);
   doc.text(`${project.name} · ${date}`, MARGIN, PAGE_H - MARGIN + 4);
   doc.text(
-    "Not to scale — all dimensions in metres",
+    `Not to scale — all dimensions in ${unitName(projectUnit(project))}`,
     PAGE_W / 2,
     PAGE_H - MARGIN + 4,
     { align: "center" },

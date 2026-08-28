@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { addOpening, addRoom, commitWallChain, moveNode } from "../model/ops";
+import { projectUnit } from "../model/factory";
 import type { Point } from "../model/types";
 import { PlanSvg } from "../render/PlanSvg";
 import { ACCENT, NOTIONAL } from "../render/theme";
-import { mmToM } from "../model/units";
+import { formatLengthWithUnit } from "../model/units";
 import { useStore } from "../state/store";
 import { snapPoint } from "./snapping";
 import { useViewport } from "./useViewport";
@@ -158,7 +159,10 @@ export function Canvas({ width, height }: { width: number; height: number }) {
           fontFamily="Helvetica, Arial, sans-serif"
           textAnchor="middle"
         >
-          {mmToM(Math.round(Math.hypot(draft.cursor.x - origin.x, draft.cursor.y - origin.y)))} m
+          {formatLengthWithUnit(
+            Math.round(Math.hypot(draft.cursor.x - origin.x, draft.cursor.y - origin.y)),
+            projectUnit(project),
+          )}
         </text>
       )}
     </g>
