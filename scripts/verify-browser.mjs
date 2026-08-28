@@ -118,6 +118,23 @@ for (const [dx, dy] of [[0.3, 0.3], [0.5, 0.3], [0.5, 0.5]]) {
 const beforeBackspace = await page.locator('[data-testid="draft-point"]').count();
 await page.keyboard.press("Backspace");
 const afterBackspace = await page.locator('[data-testid="draft-point"]').count();
+
+// Drift onto the column of an existing corner: a guide should appear and snap the point.
+// Ask the SVG itself where plan (0,0) — a real corner of the flat — lands on screen.
+const corner = await page.evaluate(() => {
+  const svg = document.querySelector('[data-testid="plan-svg"]');
+  const p = svg.createSVGPoint();
+  p.x = 0;
+  p.y = 0;
+  const s = p.matrixTransform(svg.getScreenCTM());
+  return { x: s.x, y: s.y };
+});
+await page.mouse.move(svgBox.x + svgBox.width * 0.5, svgBox.y + svgBox.height * 0.75);
+await page.mouse.move(corner.x + 2, svgBox.y + svgBox.height * 0.85);
+await page.waitForTimeout(250);
+const guideCount = await page.locator('[data-testid="align-guide"]').count();
+await page.screenshot({ path: join(OUT, "align-guide.png") });
+
 await page.keyboard.press("Escape");
 await page.getByRole("button", { name: "Select" }).click();
 
@@ -150,6 +167,7 @@ const checks = [
   ["chain sums to the inside length", chainSum === 508],
   ["setting-out chain marks each opening", chainSegs === 4],
   ["backspace takes back the last corner", beforeBackspace === 3 && afterBackspace === 2],
+  ["an alignment guide appears when lining up with a corner", guideCount > 0],
   ["no page or console errors", problems.length === 0],
 ];
 

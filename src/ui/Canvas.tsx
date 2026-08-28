@@ -3,21 +3,23 @@ import { addOpening, addRoom, commitWallChain, moveNode } from "../model/ops";
 import { projectUnit } from "../model/factory";
 import type { Point } from "../model/types";
 import { PlanSvg } from "../render/PlanSvg";
-import { ACCENT, NOTIONAL } from "../render/theme";
+import { ACCENT, GUIDE, NOTIONAL } from "../render/theme";
 import { formatLengthWithUnit } from "../model/units";
 import { useStore } from "../state/store";
-import { snapPoint } from "./snapping";
+import { resolveSnap, type Guide } from "./snapping";
 import { useViewport } from "./useViewport";
 
-type Draft = { points: Point[]; cursor: Point | null };
+type Draft = { points: Point[]; cursor: Point | null; guides: Guide[] };
 
-const EMPTY: Draft = { points: [], cursor: null };
+const EMPTY: Draft = { points: [], cursor: null, guides: [] };
 
 export function Canvas({ width, height }: { width: number; height: number }) {
   const project = useStore((s) => s.project);
   const tool = useStore((s) => s.tool);
   const selection = useStore((s) => s.selection);
   const apply = useStore((s) => s.apply);
+  const applyTransient = useStore((s) => s.applyTransient);
+  const beginHistoryStep = useStore((s) => s.beginHistoryStep);
   const select = useStore((s) => s.select);
   const setTool = useStore((s) => s.setTool);
 
@@ -88,7 +90,14 @@ export function Canvas({ width, height }: { width: number; height: number }) {
       return;
     }
     const raw = toPlan(e.clientX, e.clientY);
-    const pt = snapPoint(project, raw, origin, freeAngle, draft.points);
+    const { point: pt } = resolveSnap({
+      project,
+      raw,
+      origin,
+      freeAngle,
+      draftPoints: draft.points,
+      mmPerPx: viewport.mmPerPx,
+    });
 
     if (tool === "wall" || tool === "room") {
       const first = draft.points[0];
@@ -117,12 +126,23 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     if (dragging.current) {
       const raw = toPlan(e.clientX, e.clientY);
       const id = dragging.current.nodeId;
-      apply((p) => moveNode(p, id, raw));
+      // Transient: the whole drag is one undo step, not one per pixel of movement.
+      applyTransient((p) => moveNode(p, id, raw));
       return;
     }
     if (draft.points.length) {
       const raw = toPlan(e.clientX, e.clientY);
-      setDraft((d) => ({ ...d, cursor: snapPoint(project, raw, origin, freeAngle, d.points) }));
+      setDraft((d) => {
+        const snap = resolveSnap({
+          project,
+          raw,
+          origin,
+          freeAngle,
+          draftPoints: d.points,
+          mmPerPx: viewport.mmPerPx,
+        });
+        return { ...d, cursor: snap.point, guides: snap.guides };
+      });
     }
   }
 
@@ -139,6 +159,28 @@ export function Canvas({ width, height }: { width: number; height: number }) {
 
   const overlay = (
     <g data-testid="draft">
+      {draft.cursor &&
+        draft.guides.map((g) => (
+          <g key={`${g.axis}-${g.from.x}-${g.from.y}`} data-testid="align-guide" data-axis={g.axis}>
+            <line
+              x1={g.from.x}
+              y1={g.from.y}
+              x2={draft.cursor!.x}
+              y2={draft.cursor!.y}
+              stroke={GUIDE}
+              strokeWidth={viewport.mmPerPx}
+              strokeDasharray={`${5 * viewport.mmPerPx} ${5 * viewport.mmPerPx}`}
+            />
+            <circle
+              cx={g.from.x}
+              cy={g.from.y}
+              r={3 * viewport.mmPerPx}
+              fill="none"
+              stroke={GUIDE}
+              strokeWidth={viewport.mmPerPx}
+            />
+          </g>
+        ))}
       {draft.points.length > 0 && (
         <polyline
           points={[...draft.points, ...(draft.cursor ? [draft.cursor] : [])]
@@ -211,11 +253,18 @@ export function Canvas({ width, height }: { width: number; height: number }) {
         }}
         onPickOpening={(id) => tool === "select" && select({ kind: "opening", id })}
         onPickRoom={(id) => tool === "select" && select({ kind: "room", id })}
-        onPickNode={
+        onPickNode={tool === "select" ? (id) => select({ kind: "node", id }) : undefined}
+        onNodePointerDown={
           tool === "select"
-            ? (id) => {
+            ? (id, e) => {
+                // A click fires after pointerup, so starting the drag there would set the
+                // flag the moment it had just been cleared and the corner would stay
+                // stuck to the pointer. It has to begin on pointerdown.
+                e.stopPropagation();
                 select({ kind: "node", id });
+                beginHistoryStep();
                 dragging.current = { nodeId: id };
+                (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
               }
             : undefined
         }

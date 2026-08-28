@@ -20,6 +20,10 @@ type State = {
   tool: Tool;
   selection: Selection;
   apply: (fn: (p: Project) => Project) => void;
+  /** Push the current project onto the undo stack without changing it. */
+  beginHistoryStep: () => void;
+  /** Change the project without adding history, for the middle of a drag. */
+  applyTransient: (fn: (p: Project) => Project) => void;
   reset: (p: Project) => void;
   undo: () => void;
   redo: () => void;
@@ -44,6 +48,15 @@ export const useStore = create<State>((set) => ({
         past: [...s.past, s.project].slice(-UNDO_LIMIT),
         future: [],
       };
+    }),
+
+  beginHistoryStep: () =>
+    set((s) => ({ past: [...s.past, s.project].slice(-UNDO_LIMIT), future: [] })),
+
+  applyTransient: (fn) =>
+    set((s) => {
+      const next = fn(s.project);
+      return next === s.project ? s : { project: next };
     }),
 
   reset: (p) => set({ project: p, past: [], future: [], selection: { kind: "none" } }),

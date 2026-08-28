@@ -24,3 +24,6 @@ export const DIM = "#6b6b6b";
 export const ACCENT = "#1266d4";
 export const ALERT = "#c5221f";
 export const NOTIONAL = "#8a8a8a";
+
+/** Alignment guides. Distinct from the accent so a guide never reads as drawn geometry. */
+export const GUIDE = "#e0338a";

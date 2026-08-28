@@ -17,7 +17,9 @@ npm run verify   # builds, then drives the real app in Chrome and checks the PDF
 ## Using it
 
 Pick the **Wall** tool and click corner to corner. Lengths snap to 15° increments and to
-existing corners; hold **Alt** to draw at a free angle. **Backspace** takes back the last
+existing corners. A pink guide appears when the corner you are placing lines up with an
+existing one on either axis, and the corner snaps to that line; two guides at once put it on
+the intersection. Hold **Alt** to switch all of that off and draw freely. **Backspace** takes back the last
 corner if you misplace one, **Enter** finishes an open run, and clicking the first corner
 closes a loop. **Escape** abandons the run.
 

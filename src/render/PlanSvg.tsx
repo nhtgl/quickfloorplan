@@ -38,6 +38,7 @@ export type PlanSvgProps = {
   onPickRoom?: (id: string) => void;
   onPickOpening?: (id: string) => void;
   onPickNode?: (id: string) => void;
+  onNodePointerDown?: (id: string, e: React.PointerEvent) => void;
   svgRef?: (el: SVGSVGElement | null) => void;
   onPointerDown?: (e: React.PointerEvent<SVGSVGElement>) => void;
   onPointerMove?: (e: React.PointerEvent<SVGSVGElement>) => void;
@@ -368,8 +369,9 @@ export function PlanSvg(props: PlanSvgProps) {
             fill={highlightIds.includes(n.id) ? ACCENT : PAPER}
             stroke={ACCENT}
             strokeWidth={hairline * 1.5}
+            onPointerDown={(e) => props.onNodePointerDown?.(n.id, e)}
             onClick={() => props.onPickNode?.(n.id)}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "grab" }}
           />
         ))}
 

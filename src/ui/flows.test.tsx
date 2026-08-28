@@ -356,3 +356,124 @@ describe("taking back a corner", () => {
     expect((nameField as HTMLInputElement).value).toBe("Flat f");
   });
 });
+
+describe("alignment guides", () => {
+  /** Move the pointer over the canvas without clicking. */
+  function movePlan(x: number, y: number) {
+    fireEvent.pointerMove(screen.getByTestId("plan-svg"), { clientX: x, clientY: y });
+  }
+
+  it("shows a guide when the new corner lines up with an existing one", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    // Start a new run well away, then drift back onto the first wall's far corner column.
+    clickPlan(300, 500);
+    movePlan(601, 620);
+
+    const guides = screen.getAllByTestId("align-guide");
+    expect(guides.length).toBeGreaterThan(0);
+    expect(guides.some((g) => g.getAttribute("data-axis") === "x")).toBe(true);
+  });
+
+  it("shows no guide when nothing lines up", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    movePlan(437, 386);
+    expect(screen.queryAllByTestId("align-guide")).toHaveLength(0);
+  });
+
+  it("places the corner on the alignment it showed", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    const cornerX = useStore.getState().project.nodes[1].x;
+
+    clickPlan(300, 500);
+    movePlan(601, 620);
+    clickPlan(601, 620);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    const nodes = useStore.getState().project.nodes;
+    // The placed corner took the aligned corner's exact x, not the raw cursor position.
+    expect(nodes[nodes.length - 1].x).toBe(cornerX);
+  });
+
+  it("holding Alt suppresses the guides", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    clickPlan(300, 500);
+    fireEvent.keyDown(window, { key: "Alt" });
+    movePlan(601, 620);
+    expect(screen.queryAllByTestId("align-guide")).toHaveLength(0);
+  });
+});
+
+describe("dragging a corner", () => {
+  async function drawSquare() {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    clickPlan(600, 400);
+    clickPlan(200, 400);
+    clickPlan(200, 150);
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+  }
+
+  const handles = () => screen.getAllByTestId("node-handle");
+  const nodeAt = (i: number) => useStore.getState().project.nodes[i];
+
+  it("lets go of the corner on pointer up", async () => {
+    await drawSquare();
+    const svg = screen.getByTestId("plan-svg");
+
+    fireEvent.pointerDown(handles()[0], { clientX: 200, clientY: 150, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 260, clientY: 150 });
+    const dropped = { ...nodeAt(0) };
+    fireEvent.pointerUp(svg, { clientX: 260, clientY: 150 });
+
+    // Moving the pointer after letting go must not carry the corner along.
+    fireEvent.pointerMove(svg, { clientX: 500, clientY: 500 });
+    expect(nodeAt(0).x).toBe(dropped.x);
+    expect(nodeAt(0).y).toBe(dropped.y);
+  });
+
+  it("moves the corner while the pointer is down", async () => {
+    await drawSquare();
+    const svg = screen.getByTestId("plan-svg");
+    const before = { ...nodeAt(0) };
+
+    fireEvent.pointerDown(handles()[0], { clientX: 200, clientY: 150, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 280, clientY: 210 });
+    fireEvent.pointerUp(svg, { clientX: 280, clientY: 210 });
+
+    expect(nodeAt(0).x).not.toBe(before.x);
+  });
+
+  it("records the whole drag as a single undo step", async () => {
+    await drawSquare();
+    const svg = screen.getByTestId("plan-svg");
+    const before = { ...nodeAt(0) };
+
+    fireEvent.pointerDown(handles()[0], { clientX: 200, clientY: 150, button: 0 });
+    for (let x = 210; x <= 300; x += 10) {
+      fireEvent.pointerMove(svg, { clientX: x, clientY: 150 });
+    }
+    fireEvent.pointerUp(svg, { clientX: 300, clientY: 150 });
+
+    act(() => useStore.getState().undo());
+    expect(nodeAt(0).x).toBe(before.x);
+  });
+});
