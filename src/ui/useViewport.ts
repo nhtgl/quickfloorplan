@@ -57,6 +57,14 @@ export function useViewport(width: number, height: number) {
     [toPlan, current],
   );
 
+  /** Zoom about the middle of the view, which is what a zoom button should do. */
+  const zoomBy = useCallback((factor: number) => {
+    setVp((prev) => {
+      const base = prev ?? { cx: 0, cy: 0, mmPerPx: 12 };
+      return { ...base, mmPerPx: Math.min(200, Math.max(0.5, base.mmPerPx * factor)) };
+    });
+  }, []);
+
   const panBy = useCallback((dxPx: number, dyPx: number) => {
     setVp((prev) => {
       const base = prev ?? { cx: 0, cy: 0, mmPerPx: 12 };
@@ -64,5 +72,5 @@ export function useViewport(width: number, height: number) {
     });
   }, []);
 
-  return { viewport: current, viewBox, svgRef, fit, toPlan, zoomAt, panBy };
+  return { viewport: current, viewBox, svgRef, fit, toPlan, zoomAt, zoomBy, panBy };
 }

@@ -86,6 +86,18 @@ const rooms = await page.locator('[data-testid="room-fill"]').count();
 const notional = await page.locator('[data-testid="notional-edge"]').count();
 const doorArcs = await page.locator('[data-testid="door-arc"]').count();
 
+// Select a wall and confirm its openings are listed in the panel.
+await page.getByRole("button", { name: "Select" }).click();
+// A bare SVG <line> has a zero-height bounding box, which Playwright reads as
+// invisible, so dispatch the click straight at the element.
+await page.locator('[data-testid="wall"]').first().dispatchEvent("click");
+const openingRows = await page.locator('[data-testid="opening-row"]').allTextContents();
+await page.screenshot({ path: join(OUT, "wall-selected.png") });
+
+const zoomIn = await page.getByRole("button", { name: "Zoom in" }).count();
+const fitBtn = await page.getByRole("button", { name: "Fit plan to view" }).count();
+const panTool = await page.getByRole("button", { name: "Pan" }).count();
+
 const [download] = await Promise.all([
   page.waitForEvent("download", { timeout: 60000 }),
   page.getByRole("button", { name: "Export PDF" }).click(),
@@ -107,6 +119,8 @@ const checks = [
   ["PDF starts with %PDF-", text.startsWith("%PDF-")],
   ["PDF has 5 pages (plan + 4 walls)", pages === 5],
   ["PDF larger than 5kB", pdf.length > 5000],
+  ["wall A panel lists its 2 windows", openingRows.length === 2 && openingRows.every((t) => t.includes("Window"))],
+  ["zoom, fit and pan controls present", zoomIn === 1 && fitBtn === 1 && panTool === 1],
   ["no page or console errors", problems.length === 0],
 ];
 

@@ -4,7 +4,7 @@ import type { Project } from "../model/types";
 
 export const UNDO_LIMIT = 50;
 
-export type Tool = "select" | "wall" | "door" | "window" | "passage" | "room";
+export type Tool = "select" | "pan" | "wall" | "door" | "window" | "passage" | "room";
 
 export type Selection =
   | { kind: "none" }

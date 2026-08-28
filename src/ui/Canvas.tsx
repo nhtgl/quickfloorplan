@@ -25,7 +25,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const dragging = useRef<{ nodeId: string } | null>(null);
   const panning = useRef<{ x: number; y: number } | null>(null);
 
-  const { viewport, viewBox, svgRef, fit, toPlan, zoomAt, panBy } = useViewport(width, height);
+  const { viewport, viewBox, svgRef, fit, toPlan, zoomAt, zoomBy, panBy } = useViewport(width, height);
 
   useEffect(() => {
     fit(project);
@@ -71,7 +71,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const origin = draft.points.length ? draft.points[draft.points.length - 1] : null;
 
   function onPointerDown(e: React.PointerEvent<SVGSVGElement>) {
-    if (e.button === 1 || e.shiftKey) {
+    if (e.button === 1 || e.shiftKey || tool === "pan") {
       panning.current = { x: e.clientX, y: e.clientY };
       (e.target as Element).setPointerCapture?.(e.pointerId);
       return;
@@ -165,7 +165,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   );
 
   return (
-    <div onWheel={onWheel} style={{ lineHeight: 0 }}>
+    <div onWheel={onWheel} style={{ lineHeight: 0, position: "relative" }}>
       <PlanSvg
         project={project}
         width={width}
@@ -205,9 +205,28 @@ export function Canvas({ width, height }: { width: number; height: number }) {
             : undefined
         }
         overlay={overlay}
-        style={{ cursor: tool === "select" ? "default" : "crosshair", display: "block" }}
+        style={{
+          cursor: tool === "pan" ? "grab" : tool === "select" ? "default" : "crosshair",
+          display: "block",
+        }}
       />
       <PointerTracker onMove={(pt) => (lastPointerPlan.current = pt)} toPlan={toPlan} />
+
+      <div className="viewctl" data-testid="view-controls">
+        <button aria-label="Zoom out" title="Zoom out" onClick={() => zoomBy(1.25)}>
+          −
+        </button>
+        <button aria-label="Zoom in" title="Zoom in" onClick={() => zoomBy(1 / 1.25)}>
+          +
+        </button>
+        <button
+          aria-label="Fit plan to view"
+          title="Fit the whole plan in view (F)"
+          onClick={() => fit(project)}
+        >
+          Fit
+        </button>
+      </div>
     </div>
   );
 }

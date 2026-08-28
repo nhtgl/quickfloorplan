@@ -7,6 +7,7 @@ import { useStore, type Tool } from "../state/store";
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: "select", label: "Select", hint: "Pick and edit (V)" },
+  { id: "pan", label: "Pan", hint: "Drag to move the view (H). Shift-drag works with any tool." },
   { id: "wall", label: "Wall", hint: "Click corner to corner (W)" },
   { id: "door", label: "Door", hint: "Click a wall (D)" },
   { id: "window", label: "Window", hint: "Click a wall (N)" },

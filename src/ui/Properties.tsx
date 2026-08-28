@@ -6,6 +6,7 @@ import {
   wallLength,
 } from "../model/geometry";
 import {
+  addOpeningAtOffset,
   deleteOpening,
   deleteRoom,
   deleteWall,
@@ -13,8 +14,9 @@ import {
   updateRoom,
   updateWall,
 } from "../model/ops";
+import { labelOffsetAlongWall } from "../model/openings";
 import { roomArea } from "../model/rooms";
-import type { Opening, Project } from "../model/types";
+import type { Opening, OpeningKind, Project } from "../model/types";
 import { mm2ToM2, mmToM, mToMm } from "../model/units";
 import { ROOM_TINTS } from "../render/theme";
 import { useStore } from "../state/store";
@@ -110,6 +112,8 @@ export function Properties() {
             Use the project height ({mmToM(project.defaultWallHeight)} m)
           </button>
         )}
+        <OpeningList wallId={wall.id} wallLabel={wall.label} />
+
         <button
           className="danger"
           onClick={() => {
@@ -265,6 +269,78 @@ function NodePanel({ project, nodeId }: { project: Project; nodeId: string }) {
         </p>
       )}
     </aside>
+  );
+}
+
+const KIND_NAME: Record<OpeningKind, string> = {
+  door: "Door",
+  window: "Window",
+  passage: "Opening",
+};
+
+/**
+ * Everything fitted into the selected wall, in the order it runs along the wall. Openings
+ * belong to a wall, so this is where you look for them — hunting for a small symbol on the
+ * plan to click is the wrong way to find a door you already know is there.
+ */
+function OpeningList({ wallId, wallLabel }: { wallId: string; wallLabel: string }) {
+  const project = useStore((s) => s.project);
+  const apply = useStore((s) => s.apply);
+  const select = useStore((s) => s.select);
+
+  const openings = project.openings
+    .filter((o) => o.wallId === wallId)
+    .sort((a, b) => a.offset - b.offset);
+
+  function add(kind: OpeningKind) {
+    let created = "";
+    apply((p) => {
+      const r = addOpeningAtOffset(p, wallId, labelOffsetAlongWall(p, wallId), kind);
+      created = r.id;
+      return r.project;
+    });
+    if (created) select({ kind: "opening", id: created });
+  }
+
+  return (
+    <section className="openings" data-testid="wall-openings">
+      <h3>
+        Openings <span className="count">{openings.length}</span>
+      </h3>
+
+      {openings.length === 0 && <p className="hint">Nothing in this wall yet.</p>}
+
+      <ul>
+        {openings.map((o) => (
+          <li key={o.id}>
+            <button
+              className="opening-row"
+              data-testid="opening-row"
+              onClick={() => select({ kind: "opening", id: o.id })}
+            >
+              <strong>{KIND_NAME[o.kind]}</strong>
+              <span>
+                {mmToM(o.offset)} m from {wallLabel} · {mmToM(o.width)} × {mmToM(o.height)} m
+                {o.sill > 0 ? ` · sill ${mmToM(o.sill)} m` : ""}
+              </span>
+            </button>
+            <button
+              className="row-delete"
+              aria-label={`Delete ${KIND_NAME[o.kind].toLowerCase()}`}
+              onClick={() => apply((p) => deleteOpening(p, o.id))}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div className="add-row">
+        <button onClick={() => add("door")}>+ Door</button>
+        <button onClick={() => add("window")}>+ Window</button>
+        <button onClick={() => add("passage")}>+ Opening</button>
+      </div>
+    </section>
   );
 }
 

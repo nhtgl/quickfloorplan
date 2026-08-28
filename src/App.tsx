@@ -8,6 +8,7 @@ import { useStore, type Tool } from "./state/store";
 
 const SHORTCUTS: Record<string, Tool> = {
   v: "select",
+  h: "pan",
   w: "wall",
   d: "door",
   n: "window",

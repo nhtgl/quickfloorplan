@@ -20,12 +20,17 @@ Pick the **Wall** tool and click corner to corner. Lengths snap to 15° incremen
 existing corners; hold **Alt** to draw at a free angle. Click the first corner to close a
 loop, or press **Enter** to finish an open run.
 
-Select any wall to type its exact length, its angle to the previous wall, its thickness, and
-a height override. **Door**, **Window** and **Opening** place a fitting on the wall you
-click, which you then correct by typing numbers. **Room** outlines an area.
+Select any wall to type its exact length, its angle to the previous wall, its thickness and
+a height override. The same panel lists every door, window and opening in that wall with its
+position and size, so you can find and edit one without hunting for its symbol on the plan,
+and add or remove them from there. **Door**, **Window** and **Opening** also place a fitting
+on whichever wall you click. **Room** outlines an area.
 
-Keys: `V` select, `W` wall, `D` door, `N` window, `P` opening, `R` room, `F` fit to view,
-`Cmd/Ctrl+Z` undo. Wheel zooms, shift-drag or middle-drag pans.
+Zoom and fit buttons sit at the bottom right of the canvas. The **Pan** tool drags the view,
+and shift-drag or middle-drag pans with any tool selected.
+
+Keys: `V` select, `H` pan, `W` wall, `D` door, `N` window, `P` opening, `R` room, `F` fit to
+view, `Cmd/Ctrl+Z` undo. The wheel zooms.
 
 Projects are `.floorplan.json` files on your disk. The app also autosaves to the browser so
 a refresh never loses work, but the file is the thing you own and share.

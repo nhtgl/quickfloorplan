@@ -37,22 +37,17 @@ const DEFAULTS: Record<OpeningKind, { width: number; height: number; sill: numbe
   passage: { width: 1000, height: 2100, sill: 0 },
 };
 
-/**
- * Place an opening where the user clicked, clamped so it starts inside the wall. The
- * numbers are meant to be corrected by typing; the click only picks a starting point.
- */
-export function addOpening(
+/** Place an opening at a measured distance along the wall, clamped to stay on it. */
+export function addOpeningAtOffset(
   p: Project,
   wallId: string,
-  at: Point,
+  offsetMm: number,
   kind: OpeningKind,
 ): { project: Project; id: string } {
-  const { a, b } = wallEnds(p, wallId);
   const len = wallLength(p, wallId) || 1;
-  const t = ((at.x - a.x) * (b.x - a.x) + (at.y - a.y) * (b.y - a.y)) / (len * len);
   const d = DEFAULTS[kind];
   const half = d.width / 2;
-  const offset = Math.round(Math.min(Math.max(t * len, half), Math.max(len - half, half)));
+  const offset = Math.round(Math.min(Math.max(offsetMm, half), Math.max(len - half, half)));
 
   const opening: Opening = {
     id: newId("o"),
@@ -63,6 +58,22 @@ export function addOpening(
     ...(kind === "door" ? { hinge: "a" as const, swing: "in" as const } : {}),
   };
   return { project: touch({ ...p, openings: [...p.openings, opening] }), id: opening.id };
+}
+
+/**
+ * Place an opening where the user clicked. The numbers are meant to be corrected by
+ * typing; the click only picks a starting point.
+ */
+export function addOpening(
+  p: Project,
+  wallId: string,
+  at: Point,
+  kind: OpeningKind,
+): { project: Project; id: string } {
+  const { a, b } = wallEnds(p, wallId);
+  const len = wallLength(p, wallId) || 1;
+  const t = ((at.x - a.x) * (b.x - a.x) + (at.y - a.y) * (b.y - a.y)) / (len * len);
+  return addOpeningAtOffset(p, wallId, t * len, kind);
 }
 
 export function addRoom(p: Project, polygon: Point[], name?: string): { project: Project; id: string } {

@@ -147,3 +147,82 @@ describe("undo", () => {
     expect(useStore.getState().project.walls).toHaveLength(0);
   });
 });
+
+describe("wall panel", () => {
+  it("lists every opening on the selected wall, in order along it", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(700, 150);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    const wallId = useStore.getState().project.walls[0].id;
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+
+    // Added out of order; the list must read along the wall.
+    await userEvent.click(await screen.findByRole("button", { name: "+ Window" }));
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+    await userEvent.click(await screen.findByRole("button", { name: "+ Door" }));
+    act(() =>
+      useStore.getState().apply((p) => ({
+        ...p,
+        openings: p.openings.map((o, i) => (i === 1 ? { ...o, offset: 600 } : o)),
+      })),
+    );
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+
+    const rows = await screen.findAllByTestId("opening-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("Door");
+    expect(rows[1]).toHaveTextContent("Window");
+  });
+
+  it("selects an opening from the list", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(700, 150);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    const wallId = useStore.getState().project.walls[0].id;
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+    await userEvent.click(await screen.findByRole("button", { name: "+ Door" }));
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+
+    await userEvent.click((await screen.findAllByTestId("opening-row"))[0]);
+    expect(useStore.getState().selection.kind).toBe("opening");
+  });
+
+  it("removes an opening from the list", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(700, 150);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    const wallId = useStore.getState().project.walls[0].id;
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+    await userEvent.click(await screen.findByRole("button", { name: "+ Window" }));
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+
+    await userEvent.click(await screen.findByRole("button", { name: /Delete window/i }));
+    expect(useStore.getState().project.openings).toHaveLength(0);
+  });
+});
+
+describe("view controls", () => {
+  it("offers zoom and fit buttons", () => {
+    render(<App />);
+    expect(screen.getByRole("button", { name: "Zoom in" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zoom out" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fit plan to view" })).toBeInTheDocument();
+  });
+
+  it("has a pan tool that does not draw", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Pan" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    expect(useStore.getState().project.walls).toHaveLength(0);
+  });
+});
