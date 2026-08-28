@@ -109,3 +109,46 @@ describe("photos in a project file", () => {
     if (!result.ok) expect(result.error).toContain("kitchen.jpg");
   });
 })
+
+describe("walls written before the faces became independent", () => {
+  function legacyProject() {
+    const p = fullProject();
+    return {
+      ...p,
+      walls: p.walls.map(({ offsets, ...rest }) => {
+        void offsets;
+        return { ...rest, thickness: 240 };
+      }),
+    };
+  }
+
+  it("splits an old centred thickness evenly between the two faces", () => {
+    const result = deserialize(JSON.stringify(legacyProject()));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.project.walls[0].offsets).toEqual({ left: 120, right: 120 });
+    }
+  });
+
+  it("leaves a file that already has faces alone", () => {
+    const p = fullProject();
+    p.walls[0].offsets = { left: 40, right: 160 };
+    const result = deserialize(serialize(p));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.project.walls[0].offsets).toEqual({ left: 40, right: 160 });
+  });
+
+  it("rejects a wall with neither, naming it", () => {
+    const p = fullProject();
+    const broken = {
+      ...p,
+      walls: p.walls.map(({ offsets, ...rest }) => {
+        void offsets;
+        return rest;
+      }),
+    };
+    const result = deserialize(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("A");
+  });
+});

@@ -1,5 +1,6 @@
 import { wallEnds } from "./geometry";
 import type { Point, Project, Room, RoomId, WallId } from "./types";
+import { wallThickness } from "./walls";
 
 /**
  * A wall counts as bordering a room when at least this much of its centreline runs
@@ -117,7 +118,7 @@ function wallBordersRoom(p: Project, wallId: WallId, room: Room): boolean {
   if (room.polygon.length < 2) return false;
   const { a, b } = wallEnds(p, wallId);
   const wall = p.walls.find((w) => w.id === wallId)!;
-  const tolerance = wall.thickness / 2 + ROOM_MATCH_SLACK_MM;
+  const tolerance = wallThickness(wall) / 2 + ROOM_MATCH_SLACK_MM;
   let hits = 0;
   for (let i = 0; i < SAMPLES; i += 1) {
     const t = i / (SAMPLES - 1);
@@ -147,7 +148,7 @@ export function edgeHasWallBehind(p: Project, a: Point, b: Point): boolean {
   if (len === 0) return false;
   for (const wall of p.walls) {
     const ends = wallEnds(p, wall.id);
-    const tolerance = wall.thickness / 2 + ROOM_MATCH_SLACK_MM;
+    const tolerance = wallThickness(wall) / 2 + ROOM_MATCH_SLACK_MM;
     let hits = 0;
     for (let i = 0; i < SAMPLES; i += 1) {
       const t = i / (SAMPLES - 1);

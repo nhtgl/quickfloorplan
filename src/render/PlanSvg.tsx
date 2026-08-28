@@ -18,6 +18,7 @@ import {
 } from "../model/openings";
 import { pointAlongWall as alongWall } from "../model/geometry";
 import { viewSpan, wallOpeningViews } from "../model/sharedOpenings";
+import { bandShift, wallThickness } from "../model/walls";
 import { edgeHasWallBehind, roomArea } from "../model/rooms";
 import type { Point, Project } from "../model/types";
 import { formatArea, formatDeg, formatLengthWithUnit } from "../model/units";
@@ -51,6 +52,35 @@ export type PlanSvgProps = {
   onPointerUp?: (e: React.PointerEvent<SVGSVGElement>) => void;
   style?: React.CSSProperties;
 };
+
+/**
+ * The band a wall occupies. With faces at independent distances the band is no longer
+ * centred on the centreline, so it is drawn along its own middle instead.
+ */
+function wallBand(p: Project, id: string): { from: Point; to: Point; width: number } {
+  const wall = p.walls.find((w) => w.id === id)!;
+  const { a, b } = wallEnds(p, id);
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = (-(b.y - a.y) / len) * bandShift(wall);
+  const ny = ((b.x - a.x) / len) * bandShift(wall);
+  return {
+    from: { x: a.x + nx, y: a.y + ny },
+    to: { x: b.x + nx, y: b.y + ny },
+    width: wallThickness(wall),
+  };
+}
+
+/** A point a measured distance along a wall, moved onto the middle of its band. */
+function shiftAlongBand(p: Project, id: string, distance: number): Point {
+  const wall = p.walls.find((w) => w.id === id)!;
+  const { a, b } = wallEnds(p, id);
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const on = alongWall(p, id, distance);
+  return {
+    x: on.x + (-(b.y - a.y) / len) * bandShift(wall),
+    y: on.y + ((b.x - a.x) / len) * bandShift(wall),
+  };
+}
 
 function centroid(pts: Point[]): Point {
   const sum = pts.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
@@ -157,19 +187,19 @@ export function PlanSvg(props: PlanSvgProps) {
         })}
 
       {p.walls.map((w) => {
-        const { a, b } = wallEnds(p, w.id);
+        const band = wallBand(p, w.id);
         const selected = highlightIds.includes(w.id);
         return (
           <line
             key={w.id}
             data-testid="wall"
             data-wall-label={w.label}
-            x1={a.x}
-            y1={a.y}
-            x2={b.x}
-            y2={b.y}
+            x1={band.from.x}
+            y1={band.from.y}
+            x2={band.to.x}
+            y2={band.to.y}
             stroke={selected ? ACCENT : WALL}
-            strokeWidth={w.thickness}
+            strokeWidth={band.width}
             strokeLinecap="butt"
             onPointerDown={(e) => props.onWallPointerDown?.(w.id, e)}
             onClick={() => props.onPickWall?.(w.id)}
@@ -206,8 +236,9 @@ export function PlanSvg(props: PlanSvgProps) {
           .filter((view) => !view.own)
           .map((view) => {
             const [start, end] = viewSpan(view);
-            const from = alongWall(p, w.id, start);
-            const to = alongWall(p, w.id, end);
+            const band = wallBand(p, w.id);
+            const from = shiftAlongBand(p, w.id, start);
+            const to = shiftAlongBand(p, w.id, end);
             return (
               <line
                 key={`${w.id}-${view.opening.id}-cut`}
@@ -217,7 +248,7 @@ export function PlanSvg(props: PlanSvgProps) {
                 x2={to.x}
                 y2={to.y}
                 stroke={PAPER}
-                strokeWidth={w.thickness}
+                strokeWidth={band.width}
                 strokeLinecap="butt"
               />
             );
@@ -228,6 +259,11 @@ export function PlanSvg(props: PlanSvgProps) {
       {p.openings.map((o) => {
         const seg = openingPlanSegment(p, o.id);
         const wall = p.walls.find((w) => w.id === o.wallId)!;
+        const band = wallBand(p, wall.id);
+        const cut = {
+          from: shiftAlongBand(p, wall.id, viewSpan({ opening: o, own: true, offset: o.offset })[0]),
+          to: shiftAlongBand(p, wall.id, viewSpan({ opening: o, own: true, offset: o.offset })[1]),
+        };
         const arc = doorSwingArc(p, o.id);
         const alert = alertIds.includes(o.id);
         const selected = highlightIds.includes(o.id);
@@ -235,12 +271,12 @@ export function PlanSvg(props: PlanSvgProps) {
         return (
           <g key={o.id} data-testid="opening" data-opening-kind={o.kind}>
             <line
-              x1={seg.from.x}
-              y1={seg.from.y}
-              x2={seg.to.x}
-              y2={seg.to.y}
+              x1={cut.from.x}
+              y1={cut.from.y}
+              x2={cut.to.x}
+              y2={cut.to.y}
               stroke={PAPER}
-              strokeWidth={wall.thickness}
+              strokeWidth={band.width}
               strokeLinecap="butt"
             />
             {o.kind === "window" && (
@@ -279,7 +315,7 @@ export function PlanSvg(props: PlanSvgProps) {
               x2={seg.to.x}
               y2={seg.to.y}
               stroke="transparent"
-              strokeWidth={Math.max(wall.thickness, 8 * mmPerPx)}
+              strokeWidth={Math.max(band.width, 8 * mmPerPx)}
               onClick={() => props.onPickOpening?.(o.id)}
               style={{ cursor: props.onPickOpening ? "pointer" : undefined }}
             />

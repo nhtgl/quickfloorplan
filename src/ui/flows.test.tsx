@@ -1057,3 +1057,62 @@ describe("drawing against an existing wall's faces", () => {
     expect(after.nodes.some((n) => n.x === inner.x && n.y === inner.y)).toBe(true);
   });
 });
+
+describe("editing a wall's two faces", () => {
+  async function aRoomWithName() {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+    await userEvent.type(screen.getByTestId("room-name-input"), "Kitchen");
+    await userEvent.type(screen.getByTestId("measurements-input"), "400,90,300,90,400,90,300,90");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+
+    const p = useStore.getState().project;
+    act(() => useStore.getState().select({ kind: "wall", id: p.walls[0].id }));
+    return p.walls[0].id;
+  }
+
+  it("offers a field per face, named after what is on that side", async () => {
+    await aRoomWithName();
+    expect(await screen.findByTestId("wall-faces")).toBeInTheDocument();
+    expect(screen.getByLabelText("Kitchen face")).toBeInTheDocument();
+    expect(screen.getByLabelText("Other side face")).toBeInTheDocument();
+  });
+
+  it("moves one face without touching the other", async () => {
+    const wallId = await aRoomWithName();
+    const before = useStore.getState().project.walls.find((w) => w.id === wallId)!.offsets;
+
+    const field = await screen.findByLabelText("Kitchen face");
+    await userEvent.clear(field);
+    await userEvent.type(field, "25");
+    fireEvent.blur(field);
+
+    const after = useStore.getState().project.walls.find((w) => w.id === wallId)!.offsets;
+    expect(after.left).toBe(250);
+    expect(after.right).toBe(before.right);
+  });
+
+  it("shows the resulting thickness as the two faces together", async () => {
+    const wallId = await aRoomWithName();
+    const field = await screen.findByLabelText("Kitchen face");
+    await userEvent.clear(field);
+    await userEvent.type(field, "25");
+    fireEvent.blur(field);
+
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+    expect(await screen.findByTestId("wall-faces")).toHaveTextContent("30 cm thick");
+  });
+
+  it("refuses to put a face behind the centreline", async () => {
+    const wallId = await aRoomWithName();
+    const field = await screen.findByLabelText("Kitchen face");
+    await userEvent.clear(field);
+    await userEvent.type(field, "-15");
+    fireEvent.blur(field);
+
+    expect(
+      useStore.getState().project.walls.find((w) => w.id === wallId)!.offsets.left,
+    ).toBe(0);
+  });
+});

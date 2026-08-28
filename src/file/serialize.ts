@@ -54,6 +54,21 @@ export function deserialize(json: string): LoadResult {
     return { ok: false, error: "Project is missing a default wall height." };
   }
 
+  // Walls used to carry a single centred thickness. Split it evenly into the two face
+  // offsets so files written before the faces became independent still open.
+  const walls = (p.walls ?? []).map((w) => {
+    const legacy = w as unknown as { thickness?: number };
+    if (w.offsets) return w;
+    if (typeof legacy.thickness !== "number") return w;
+    return { ...w, offsets: { left: legacy.thickness / 2, right: legacy.thickness / 2 } };
+  });
+  for (const w of walls) {
+    if (!w.offsets || typeof w.offsets.left !== "number" || typeof w.offsets.right !== "number") {
+      return { ok: false, error: `Wall ${w.label ?? w.id} has no face measurements.` };
+    }
+  }
+  p.walls = walls;
+
   const nodeIds = new Set((p.nodes ?? []).map((n) => n.id));
   for (const w of p.walls ?? []) {
     if (!nodeIds.has(w.a) || !nodeIds.has(w.b)) {

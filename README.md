@@ -79,8 +79,12 @@ the intersection. Hold **Alt** to switch all of that off and draw freely. **Back
 corner if you misplace one, **Enter** finishes an open run, and clicking the first corner
 closes a loop. **Escape** abandons the run.
 
-Select any wall to type its exact length, its angle to the previous wall, its thickness and
-a height override. The same panel lists every door, window and opening in that wall with its
+Select any wall to type its exact length, its angle to the previous wall, a height override,
+and **the position of each of its two faces separately**. A wall is not one centred
+thickness: the faces are what get measured, and they move on their own. Correcting the
+thickness of a wall you have already measured one room against would otherwise shift that
+room's face too. Each field is named after what lies on that side, so you set "the kitchen
+face", not "the left one". The same panel lists every door, window and opening in that wall with its
 position and size, so you can find and edit one without hunting for its symbol on the plan,
 and add or remove them from there. **Door**, **Window** and **Opening** also place a fitting
 on whichever wall you click. **Room** outlines an area.

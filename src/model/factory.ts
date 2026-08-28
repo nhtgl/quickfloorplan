@@ -1,4 +1,5 @@
 import { newId, nextWallLabel } from "./ids";
+import { evenOffsets } from "./walls";
 import { SCHEMA, type PlanNode, type Point, type Project, type Wall } from "./types";
 import { DEFAULT_MEASURE } from "./measure";
 import { DEFAULT_UNIT, type Unit } from "./units";
@@ -36,7 +37,7 @@ export function addWall(
     id: newId("w"),
     a,
     b,
-    thickness,
+    offsets: evenOffsets(thickness),
     label: nextWallLabel(p.walls.map((w) => w.label)),
   };
   return { project: { ...p, walls: [...p.walls, wall] }, wall };

@@ -21,8 +21,11 @@ import {
 } from "../model/ops";
 import { labelOffsetAlongWall } from "../model/openings";
 import { wallOpeningViews } from "../model/sharedOpenings";
+import { wallSideNames } from "../model/faces";
+import { wallThickness } from "../model/walls";
 import { roomArea } from "../model/rooms";
-import type { Opening, OpeningKind, Project } from "../model/types";
+import type { Opening, OpeningKind, Project, Wall } from "../model/types";
+import type { Unit } from "../model/units";
 import { formatArea, formatLength, parseLength, stepFor } from "../model/units";
 import { projectUnit } from "../model/factory";
 import { ROOM_TINTS } from "../render/theme";
@@ -109,12 +112,7 @@ export function Properties() {
             onCommit={(v) => apply((p) => setWallAngleDeg(p, wall.id, v))}
           />
         )}
-        <NumberField
-          label="Thickness"
-          {...num}
-          value={formatLength(wall.thickness, unit)}
-          onCommit={(v) => apply((p) => updateWall(p, wall.id, { thickness: parseLength(v, unit) }))}
-        />
+        <FaceFields wall={wall} unit={unit} />
         <NumberField
           label="Height"
           {...num}
@@ -284,6 +282,43 @@ export function Properties() {
   }
 
   return <NodePanel project={project} nodeId={selection.id} />;
+}
+
+/**
+ * The two faces of a wall, edited on their own. Moving one leaves the other where it is,
+ * so correcting the thickness of a wall does not disturb a room already measured against
+ * its other side.
+ */
+function FaceFields({ wall, unit }: { wall: Wall; unit: Unit }) {
+  const project = useStore((s) => s.project);
+  const apply = useStore((s) => s.apply);
+  const names = wallSideNames(project, wall.id);
+  const step = stepFor(unit);
+
+  return (
+    <section className="faces" data-testid="wall-faces">
+      <h3>
+        Faces <span className="count">{formatLength(wallThickness(wall), unit)} {unit} thick</span>
+      </h3>
+      {(["left", "right"] as const).map((side) => (
+        <NumberField
+          key={side}
+          label={`${names[side]} face`}
+          suffix={unit}
+          step={step}
+          value={formatLength(wall.offsets[side], unit)}
+          onCommit={(v) =>
+            apply((p) =>
+              updateWall(p, wall.id, {
+                offsets: { ...wall.offsets, [side]: Math.max(0, parseLength(v, unit)) },
+              }),
+            )
+          }
+        />
+      ))}
+      <p className="hint">Distance from the wall's centreline to that face.</p>
+    </section>
+  );
 }
 
 function NodePanel({ project, nodeId }: { project: Project; nodeId: string }) {

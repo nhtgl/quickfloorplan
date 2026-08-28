@@ -1,6 +1,7 @@
 import { pointAlongWall, wallById, wallEnds } from "./geometry";
 import { wallSpanForSide } from "./measure";
 import type { Point, Project, WallId } from "./types";
+import { offsetForSide } from "./walls";
 
 /** Which of a wall's three lines a point sits on. */
 export type WallLine = "left" | "centre" | "right";
@@ -25,7 +26,7 @@ export function wallLinePoints(
   // Left-hand normal of the wall's own direction.
   const nx = -(b.y - a.y) / len;
   const ny = (b.x - a.x) / len;
-  const off = (side * wallById(p, id).thickness) / 2;
+  const off = side * offsetForSide(wallById(p, id), side);
 
   const span = wallSpanForSide(p, id, side);
   const at = (d: number): Point => {
@@ -51,4 +52,36 @@ export function wallFaceCorners(p: Project, id: WallId): FaceCorner[] {
 /** Every face corner in the project, for snapping a new wall onto an existing one. */
 export function allFaceCorners(p: Project): FaceCorner[] {
   return p.walls.flatMap((w) => wallFaceCorners(p, w.id));
+}
+
+/**
+ * What lies on each side of a wall, for naming its two faces.
+ *
+ * "Left" and "right" mean nothing to someone holding a tape, but "the kitchen side" does.
+ * A side with no room against it is outside the plan as drawn.
+ */
+export function wallSideNames(p: Project, id: WallId): { left: string; right: string } {
+  const { a, b } = wallEnds(p, id);
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = -(b.y - a.y) / len;
+  const ny = (b.x - a.x) / len;
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+
+  const names: { left: string[]; right: string[] } = { left: [], right: [] };
+  for (const room of p.rooms) {
+    if (room.polygon.length < 3) continue;
+    const c = room.polygon.reduce(
+      (acc, pt) => ({ x: acc.x + pt.x / room.polygon.length, y: acc.y + pt.y / room.polygon.length }),
+      { x: 0, y: 0 },
+    );
+    const side = (c.x - mid.x) * nx + (c.y - mid.y) * ny;
+    // Only rooms actually against this wall, not every room in the plan.
+    if (Math.hypot(c.x - mid.x, c.y - mid.y) > 20_000) continue;
+    (side >= 0 ? names.left : names.right).push(room.name);
+  }
+
+  return {
+    left: names.left[0] ?? "Other side",
+    right: names.right[0] ?? "Other side",
+  };
 }

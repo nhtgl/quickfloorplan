@@ -3,7 +3,7 @@ import { mergeOpenNode, wallEnds, wallLength } from "./geometry";
 import { newId } from "./ids";
 import { nextTint } from "../render/theme";
 import { snapToNode } from "../ui/snapping";
-import type { Opening, OpeningKind, Point, Project, Room } from "./types";
+import type { Opening, OpeningKind, Point, Project, Room, WallOffsets } from "./types";
 
 const touch = (p: Project): Project => ({ ...p, updatedAt: new Date().toISOString() });
 
@@ -100,7 +100,7 @@ export function updateOpening(p: Project, id: string, patch: Partial<Opening>): 
 export function updateWall(
   p: Project,
   id: string,
-  patch: { thickness?: number; height?: number | undefined },
+  patch: { offsets?: WallOffsets; height?: number | undefined },
 ): Project {
   return touch({ ...p, walls: p.walls.map((w) => (w.id === id ? { ...w, ...patch } : w)) });
 }

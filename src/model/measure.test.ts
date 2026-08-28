@@ -42,7 +42,7 @@ describe("wallMeasuredSpan", () => {
   it("uses each neighbour's own thickness, not this wall's", () => {
     let p = rect("inside");
     // Thicken only wall B, the neighbour at wall A's far end.
-    p = updateWall(p, byLabel(p, "B").id, { thickness: 300 });
+    p = updateWall(p, byLabel(p, "B").id, { offsets: { left: 150, right: 150 } });
     expect(wallMeasuredSpan(p, byLabel(p, "A").id)).toEqual({ start: 50, end: 4050 });
     expect(wallMeasuredLength(p, byLabel(p, "A").id)).toBe(4000);
   });

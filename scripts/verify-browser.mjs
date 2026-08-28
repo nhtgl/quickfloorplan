@@ -171,6 +171,14 @@ const panTool = await page.getByRole("button", { name: "Pan" }).count();
 
 // A wall shows three lines: a face each side and the centreline between them.
 const centrelines = await page.locator('.stage [data-testid="wall-centreline"]').count();
+// The seeded project is written in the old single-thickness form, so opening it at all
+// proves the migration works.
+const migrated = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
+  return raw.walls[0].offsets;
+});
+
+
 const wallCount = await page.locator('.stage [data-testid="wall"]').count();
 
 // Drawing can catch an existing wall's face, not just its centreline corner.
@@ -202,6 +210,24 @@ const snapKind = await page
   .catch(() => null);
 await page.screenshot({ path: join(OUT, "face-snap.png") });
 await page.keyboard.press("Escape");
+
+// Each face of a wall is edited on its own.
+await page.getByRole("button", { name: "Select" }).click();
+await page.locator('[data-wall-label="A"]').first().dispatchEvent("click");
+const faceFields = await page.locator('[data-testid="wall-faces"] input').count();
+const beforeFaces = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
+  return raw.walls.find((w) => w.label === "A").offsets;
+});
+const firstFace = page.locator('[data-testid="wall-faces"] input').first();
+await firstFace.fill("30");
+await firstFace.blur();
+await page.waitForTimeout(150);
+const afterFaces = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
+  return raw.walls.find((w) => w.label === "A").offsets;
+});
+await page.screenshot({ path: join(OUT, "wall-faces.png") });
 
 // Backspace takes back the last corner while drawing.
 // "Wall" would also match the panel's "Delete wall" button.
@@ -323,7 +349,8 @@ const checks = [
   ["4 walls drawn", walls === 4],
   ["2 rooms filled", rooms === 2],
   ["shared room boundary drawn dashed, once per room", notional === 2],
-  ["1 door swing arc", doorArcs === 1],
+  // The front door and the door in the wall the second room will come to share.
+  ["both doors draw a swing arc", doorArcs === 2],
   ["every wall labelled A-D", wallLabels.join("") === "ABCD"],
   ["square corners not labelled with 90 degrees", angleLabels === 0],
   ["PDF starts with %PDF-", text.startsWith("%PDF-")],
@@ -351,6 +378,9 @@ const checks = [
   ["the shared wall cuts its own gap so the door still shows", sharedCuts >= 1],
   ["each door drawn once, so none is mirrored", arcsAfterMove === 2],
   ["every wall shows its centreline as well as its two faces", centrelines === wallCount && wallCount > 0],
+  ["a file written with the old single thickness still opens", migrated.left === 60 && migrated.right === 60],
+  ["each face has its own field", faceFields === 2],
+  ["editing one face leaves the other alone", afterFaces.left === 300 && afterFaces.right === beforeFaces.right],
   ["drawing catches a wall face, not only its centreline", snapKind === "face"],
   ["no page or console errors", problems.length === 0],
 ];

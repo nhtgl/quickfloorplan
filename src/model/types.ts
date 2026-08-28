@@ -21,12 +21,22 @@ export type PlanNode = {
   openFrom?: NodeId;
 };
 
+/**
+ * How far each face of a wall sits from its centreline, in mm.
+ *
+ * Two numbers rather than one thickness, because the faces are what get measured and
+ * they move independently. Correcting the thickness of a wall you have already measured
+ * one room against would otherwise shift that room's face too.
+ *
+ * `left` and `right` are relative to the wall's own direction, a to b.
+ */
+export type WallOffsets = { left: number; right: number };
+
 export type Wall = {
   id: WallId;
   a: NodeId;
   b: NodeId;
-  /** mm */
-  thickness: number;
+  offsets: WallOffsets;
   /** mm; falls back to Project.defaultWallHeight */
   height?: number;
   /** "A", "B", ... "Z", "AA"; never reassigned once given out. */

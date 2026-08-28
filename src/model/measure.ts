@@ -9,6 +9,7 @@ import {
   wallLength,
 } from "./geometry";
 import type { Point, Project, WallId } from "./types";
+import { offsetForSide } from "./walls";
 
 /**
  * Which faces a wall's stated length runs between.
@@ -51,7 +52,7 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
 export function wallSpanForSide(p: Project, id: WallId, side: number): Span {
   const len = wallLength(p, id);
   if (side === 0) return { start: 0, end: len };
-  const half = wallById(p, id).thickness / 2;
+  const half = offsetForSide(wallById(p, id), side);
 
   let start = 0;
   let end = len;
@@ -62,7 +63,7 @@ export function wallSpanForSide(p: Project, id: WallId, side: number): Span {
     const sin = turn === null ? 0 : Math.sin(rad(turn));
     // Collinear walls have parallel faces that never meet, so there is nothing to trim.
     if (turn !== null && Math.abs(sin) > 1e-6) {
-      end = len + (side * (half * Math.cos(rad(turn)) - next.thickness / 2)) / sin;
+      end = len + (side * (half * Math.cos(rad(turn)) - offsetForSide(next, side))) / sin;
     }
   }
 
@@ -71,7 +72,7 @@ export function wallSpanForSide(p: Project, id: WallId, side: number): Span {
     const turn = wallAngleDeg(p, id);
     const sin = turn === null ? 0 : Math.sin(rad(turn));
     if (turn !== null && Math.abs(sin) > 1e-6) {
-      start = -(side * (half * Math.cos(rad(turn)) - prev.thickness / 2)) / sin;
+      start = -(side * (half * Math.cos(rad(turn)) - offsetForSide(prev, side))) / sin;
     }
   }
 
@@ -110,7 +111,7 @@ export function wallFaceCornerAfter(p: Project, id: WallId): Point {
   // Left-hand normal of the wall's direction.
   const nx = -(b.y - a.y) / len;
   const ny = (b.x - a.x) / len;
-  const off = (faceSign * wallById(p, id).thickness) / 2;
+  const off = faceSign * offsetForSide(wallById(p, id), faceSign);
   return { x: Math.round(on.x + nx * off), y: Math.round(on.y + ny * off) };
 }
 
