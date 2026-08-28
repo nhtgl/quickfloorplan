@@ -169,6 +169,40 @@ const zoomIn = await page.getByRole("button", { name: "Zoom in" }).count();
 const fitBtn = await page.getByRole("button", { name: "Fit plan to view" }).count();
 const panTool = await page.getByRole("button", { name: "Pan" }).count();
 
+// A wall shows three lines: a face each side and the centreline between them.
+const centrelines = await page.locator('.stage [data-testid="wall-centreline"]').count();
+const wallCount = await page.locator('.stage [data-testid="wall"]').count();
+
+// Drawing can catch an existing wall's face, not just its centreline corner.
+const faceCorner = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
+  const w = raw.walls[0];
+  const a = raw.nodes.find((n) => n.id === w.a);
+  const b = raw.nodes.find((n) => n.id === w.b);
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  const nx = -(b.y - a.y) / len;
+  const ny = (b.x - a.x) / len;
+  const half = w.thickness / 2;
+  const svg = document.querySelector('[data-testid="plan-svg"]');
+  const p = svg.createSVGPoint();
+  p.x = a.x + nx * half + ((b.x - a.x) / len) * half;
+  p.y = a.y + ny * half + ((b.y - a.y) / len) * half;
+  const s = p.matrixTransform(svg.getScreenCTM());
+  return { x: s.x, y: s.y };
+});
+
+const planBox = await page.locator('[data-testid="plan-svg"]').boundingBox();
+await page.getByRole("button", { name: "Wall", exact: true }).click();
+await page.mouse.click(planBox.x + planBox.width * 0.5, planBox.y + planBox.height * 0.85);
+await page.mouse.move(faceCorner.x, faceCorner.y);
+await page.waitForTimeout(120);
+const snapKind = await page
+  .locator('[data-testid="snap-marker"]')
+  .getAttribute("data-kind")
+  .catch(() => null);
+await page.screenshot({ path: join(OUT, "face-snap.png") });
+await page.keyboard.press("Escape");
+
 // Backspace takes back the last corner while drawing.
 // "Wall" would also match the panel's "Delete wall" button.
 await page.getByRole("button", { name: "Wall", exact: true }).click();
@@ -316,6 +350,8 @@ const checks = [
   ["no second door is created when rooms meet", openingsAfter.total === 4],
   ["the shared wall cuts its own gap so the door still shows", sharedCuts >= 1],
   ["each door drawn once, so none is mirrored", arcsAfterMove === 2],
+  ["every wall shows its centreline as well as its two faces", centrelines === wallCount && wallCount > 0],
+  ["drawing catches a wall face, not only its centreline", snapKind === "face"],
   ["no page or console errors", problems.length === 0],
 ];
 

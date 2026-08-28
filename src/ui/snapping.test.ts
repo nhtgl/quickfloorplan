@@ -25,18 +25,55 @@ describe("resolveSnap", () => {
     const r = resolveSnap({ ...base, raw: { x: 4050, y: 40 } });
     expect(r.point).toEqual({ x: 4000, y: 0 });
     expect(r.onCorner).toBe(true);
+    expect(r.kind).toBe("corner");
     expect(r.guides).toEqual([]);
   });
 
-  it("lines up on x with a corner across the room and says which one", () => {
+  it("takes whichever of the corner and the face is nearer", () => {
+    // The inner face corner at (50,50) is nearer here than the wall corner at (0,0).
+    expect(resolveSnap({ ...base, raw: { x: 44, y: 44 } }).kind).toBe("face");
+    expect(resolveSnap({ ...base, raw: { x: 12, y: 12 } }).point).toEqual({ x: 0, y: 0 });
+  });
+
+  it("still closes a run on its own first corner, whatever else is nearby", () => {
+    // A face corner sits closer, but the run has to be able to close on itself.
+    const r = resolveSnap({
+      ...base,
+      draftPoints: [{ x: 0, y: 0 }],
+      raw: { x: 44, y: 44 },
+    });
+    expect(r.point).toEqual({ x: 0, y: 0 });
+  });
+
+  it("lands on a face corner when no wall corner is in reach", () => {
+    // The far end of the top wall's inner face, well clear of any centreline corner.
+    const r = resolveSnap({ ...base, raw: { x: 3946, y: 56 } });
+    expect(r.point).toEqual({ x: 3950, y: 50 });
+    expect(r.kind).toBe("face");
+  });
+
+  it("lines up on x with the nearest line across the room, faces included", () => {
+    // Walls are 100 thick, so the right-hand wall offers three lines to line up with:
+    // its inner face at 3950, its centreline at 4000 and its outer face at 4050. The
+    // nearest to the cursor wins, which here is the outer face.
     const r = resolveSnap({ ...base, raw: { x: 4030, y: 2000 } });
+    expect(r.point).toEqual({ x: 4050, y: 2000 });
+    expect(r.guides.map((g) => g.axis)).toEqual(["x"]);
+  });
+
+  it("lines up on a centreline when that is the nearest line", () => {
+    const r = resolveSnap({ ...base, raw: { x: 4008, y: 2000 } });
     expect(r.point).toEqual({ x: 4000, y: 2000 });
-    expect(r.guides).toEqual([{ axis: "x", from: { x: 4000, y: 0 } }]);
+  });
+
+  it("lines up on an inner face, which is what a room is measured to", () => {
+    const r = resolveSnap({ ...base, raw: { x: 3944, y: 2000 } });
+    expect(r.point).toEqual({ x: 3950, y: 2000 });
   });
 
   it("lines up on y", () => {
     const r = resolveSnap({ ...base, raw: { x: 2000, y: 3040 } });
-    expect(r.point).toEqual({ x: 2000, y: 3000 });
+    expect(r.point).toEqual({ x: 2000, y: 3050 });
     expect(r.guides.map((g) => g.axis)).toEqual(["y"]);
   });
 
@@ -52,7 +89,8 @@ describe("resolveSnap", () => {
       false,
     );
     const r = resolveSnap({ ...base, project: withOutrigger, raw: { x: 1530, y: 3040 } });
-    expect(r.point).toEqual({ x: 1500, y: 3000 });
+    // Nearest line on each axis, each from a different wall.
+    expect(r.point).toEqual({ x: 1550, y: 3050 });
     expect(r.guides.map((g) => g.axis).sort()).toEqual(["x", "y"]);
   });
 

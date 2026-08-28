@@ -9,6 +9,7 @@ import { addPhoto, makePhoto } from "../model/photos";
 import { loopNodeIds, loopWallIds, moveLoop } from "../model/loops";
 import { addOpeningAtOffset, updateOpening } from "../model/ops";
 import { sharedSpan, wallOpeningViews } from "../model/sharedOpenings";
+import { wallLinePoints } from "../model/faces";
 import { pageTitles } from "../export/pageTitles";
 import { roomArea } from "../model/rooms";
 import { useStore } from "../state/store";
@@ -995,5 +996,64 @@ describe("a door in a wall two rooms come to share", () => {
     parkAlmostTouching(9000);
     nudge();
     expect(useStore.getState().project.openings).toHaveLength(1);
+  });
+});
+
+describe("drawing against an existing wall's faces", () => {
+  async function aRoom() {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+    await userEvent.type(screen.getByTestId("measurements-input"), "400,90,300,90,400,90,300,90");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+  }
+
+  it("draws the centreline inside each wall, so all three lines are visible", async () => {
+    await aRoom();
+    expect(screen.getAllByTestId("wall-centreline")).toHaveLength(4);
+  });
+
+  it("marks the cursor when it catches a wall's face", async () => {
+    await aRoom();
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+
+    const p = useStore.getState().project;
+    const inner = wallLinePoints(p, p.walls[0].id, "left").from;
+
+    // Start a run, then bring the cursor onto the inner face corner of an existing wall.
+    const svg = screen.getByTestId("plan-svg");
+    fireEvent.pointerDown(svg, { clientX: 300, clientY: 500, button: 0 });
+
+    // Convert the face corner to screen coordinates through the SVG's own transform.
+    const el = svg as unknown as SVGSVGElement;
+    const vb = el.getAttribute("viewBox")!.split(" ").map(Number);
+    const rect = { width: 900, height: 600 };
+    const px = ((inner.x - vb[0]) / vb[2]) * rect.width;
+    const py = ((inner.y - vb[1]) / vb[3]) * rect.height;
+    fireEvent.pointerMove(svg, { clientX: px, clientY: py });
+
+    const marker = screen.queryByTestId("snap-marker");
+    expect(marker).not.toBeNull();
+    expect(marker!.getAttribute("data-kind")).toBe("face");
+  });
+
+  it("lands the drawn corner exactly on the face it caught", async () => {
+    await aRoom();
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+
+    const p = useStore.getState().project;
+    const inner = wallLinePoints(p, p.walls[0].id, "left").from;
+
+    const svg = screen.getByTestId("plan-svg");
+    const el = svg as unknown as SVGSVGElement;
+    const vb = el.getAttribute("viewBox")!.split(" ").map(Number);
+    const px = ((inner.x - vb[0]) / vb[2]) * 900;
+    const py = ((inner.y - vb[1]) / vb[3]) * 600;
+
+    fireEvent.pointerDown(svg, { clientX: 300, clientY: 500, button: 0 });
+    fireEvent.pointerDown(svg, { clientX: px, clientY: py, button: 0 });
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    const after = useStore.getState().project;
+    expect(after.nodes.some((n) => n.x === inner.x && n.y === inner.y)).toBe(true);
   });
 });

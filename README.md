@@ -66,8 +66,15 @@ net, not storage. The file on disk is the artifact you own.
 ## Using it
 
 Pick the **Wall** tool and click corner to corner. Lengths snap to 15° increments and to
-existing corners. A pink guide appears when the corner you are placing lines up with an
-existing one on either axis, and the corner snaps to that line; two guides at once put it on
+existing corners **and to wall faces**. A wall is three lines — a face on each side and the
+centreline between them, drawn dashed inside it — and all three can be snapped to and lined
+up with. The faces are what anyone measuring a room actually works from, and two rooms sharing
+a wall measure different ones, so they have to be reachable and not merely implied by the
+thickness of a stroke. When the cursor catches a face rather than a centreline corner it is
+marked, because the two sit only half a wall thickness apart.
+
+A pink guide appears when the corner you are placing lines up with an existing one on either
+axis, and the corner snaps to that line; two guides at once put it on
 the intersection. Hold **Alt** to switch all of that off and draw freely. **Backspace** takes back the last
 corner if you misplace one, **Enter** finishes an open run, and clicking the first corner
 closes a loop. **Escape** abandons the run.

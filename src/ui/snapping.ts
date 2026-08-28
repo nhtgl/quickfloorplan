@@ -1,3 +1,4 @@
+import { allFaceCorners } from "../model/faces";
 import type { Point, Project } from "../model/types";
 
 /** Magnet radius for landing exactly on an existing corner, in screen pixels. */
@@ -14,14 +15,32 @@ export const ANGLE_STEP_DEG = 15;
 /** A corner the point being placed lines up with, and on which axis. */
 export type Guide = { axis: "x" | "y"; from: Point };
 
+/** What the point landed on: a wall centreline corner, or a corner of a wall's face. */
+export type SnapKind = "corner" | "face" | "none";
+
 export type SnapResult = {
   point: Point;
   guides: Guide[];
-  /** True when the point landed on an existing corner rather than merely aligning with one. */
+  /** True when the point landed on something rather than merely aligning with it. */
   onCorner: boolean;
+  kind: SnapKind;
 };
 
 const round = (p: Point): Point => ({ x: Math.round(p.x), y: Math.round(p.y) });
+
+/** Nearest candidate within the magnet radius, with how far away it was. */
+export function nearestWithin(
+  candidates: Point[],
+  raw: Point,
+  radius: number,
+): { pt: Point; d: number } | null {
+  let best: { pt: Point; d: number } | null = null;
+  for (const c of candidates) {
+    const d = Math.hypot(c.x - raw.x, c.y - raw.y);
+    if (d <= radius && (!best || d < best.d)) best = { pt: { x: c.x, y: c.y }, d };
+  }
+  return best;
+}
 
 /** Nearest candidate within the magnet radius, so corners actually meet. */
 export function snapToNearest(
@@ -29,12 +48,7 @@ export function snapToNearest(
   raw: Point,
   radius: number,
 ): Point | null {
-  let best: { pt: Point; d: number } | null = null;
-  for (const c of candidates) {
-    const d = Math.hypot(c.x - raw.x, c.y - raw.y);
-    if (d <= radius && (!best || d < best.d)) best = { pt: { x: c.x, y: c.y }, d };
-  }
-  return best?.pt ?? null;
+  return nearestWithin(candidates, raw, radius)?.pt ?? null;
 }
 
 export function snapToNode(p: Project, raw: Point, radius = SNAP_RADIUS_MM): Point | null {
@@ -92,12 +106,40 @@ export function resolveSnap({
     ...project.nodes.map((n) => ({ x: n.x, y: n.y })),
   ];
 
-  const corner = snapToNearest(candidates, raw, SNAP_RADIUS_PX * mmPerPx);
-  if (corner) return { point: round(corner), guides: [], onCorner: true };
+  const magnet = SNAP_RADIUS_PX * mmPerPx;
 
-  if (freeAngle) return { point: round(raw), guides: [], onCorner: false };
+  // A corner of the run being drawn wins outright, whatever else is nearby. Clicking the
+  // run's own first corner is how a shape gets closed, and nothing may steal that.
+  const onDraft = snapToNearest(draftPoints, raw, magnet);
+  if (onDraft) return { point: round(onDraft), guides: [], onCorner: true, kind: "corner" };
+
+  // Otherwise the nearest of the wall corners and the corners of the wall faces. A face
+  // corner sits only half a thickness from its centreline corner, so preferring corners
+  // outright would put the faces permanently out of reach — and the faces are the points
+  // anyone measuring a room actually works from.
+  const faces = allFaceCorners(project).map((c) => c.point);
+  const nearestCorner = nearestWithin(
+    project.nodes.map((n) => ({ x: n.x, y: n.y })),
+    raw,
+    magnet,
+  );
+  const nearestFace = nearestWithin(faces, raw, magnet);
+  if (nearestCorner || nearestFace) {
+    const takeFace = nearestFace && (!nearestCorner || nearestFace.d < nearestCorner.d);
+    const hit = takeFace ? nearestFace! : nearestCorner!;
+    return {
+      point: round(hit.pt),
+      guides: [],
+      onCorner: true,
+      kind: takeFace ? "face" : "corner",
+    };
+  }
+
+  if (freeAngle) return { point: round(raw), guides: [], onCorner: false, kind: "none" };
 
   const tolerance = ALIGN_TOLERANCE_PX * mmPerPx;
+  // Faces line up as readily as centrelines do.
+  candidates.push(...faces);
   let alignX: Point | null = null;
   let alignY: Point | null = null;
   for (const c of candidates) {
@@ -112,6 +154,7 @@ export function resolveSnap({
       point: round(origin ? snapAngle(origin, raw) : raw),
       guides: [],
       onCorner: false,
+      kind: "none",
     };
   }
 
@@ -123,5 +166,6 @@ export function resolveSnap({
     point: round({ x: alignX ? alignX.x : raw.x, y: alignY ? alignY.y : raw.y }),
     guides,
     onCorner: false,
+    kind: "none",
   };
 }

@@ -41,10 +41,16 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
  * A wall that is not part of a closed run has no inside, so it falls back to its
  * centreline rather than inventing a side.
  */
-export function wallMeasuredSpan(p: Project, id: WallId): Span {
+/**
+ * Where one of a wall's three lines begins and ends, along its centreline axis.
+ *
+ * `side` picks the line: 0 is the centreline, +1 the face to the left of the wall's own
+ * direction, -1 the face to the right. A face stops where it meets its neighbour's face,
+ * so the trim depends on the neighbour's thickness and the angle between them.
+ */
+export function wallSpanForSide(p: Project, id: WallId, side: number): Span {
   const len = wallLength(p, id);
-  const faceSign = wallFaceSign(p, id);
-  if (faceSign === 0) return { start: 0, end: len };
+  if (side === 0) return { start: 0, end: len };
   const half = wallById(p, id).thickness / 2;
 
   let start = 0;
@@ -56,7 +62,7 @@ export function wallMeasuredSpan(p: Project, id: WallId): Span {
     const sin = turn === null ? 0 : Math.sin(rad(turn));
     // Collinear walls have parallel faces that never meet, so there is nothing to trim.
     if (turn !== null && Math.abs(sin) > 1e-6) {
-      end = len + (faceSign * (half * Math.cos(rad(turn)) - next.thickness / 2)) / sin;
+      end = len + (side * (half * Math.cos(rad(turn)) - next.thickness / 2)) / sin;
     }
   }
 
@@ -65,11 +71,15 @@ export function wallMeasuredSpan(p: Project, id: WallId): Span {
     const turn = wallAngleDeg(p, id);
     const sin = turn === null ? 0 : Math.sin(rad(turn));
     if (turn !== null && Math.abs(sin) > 1e-6) {
-      start = -(faceSign * (half * Math.cos(rad(turn)) - prev.thickness / 2)) / sin;
+      start = -(side * (half * Math.cos(rad(turn)) - prev.thickness / 2)) / sin;
     }
   }
 
   return { start: Math.round(start), end: Math.round(end) };
+}
+
+export function wallMeasuredSpan(p: Project, id: WallId): Span {
+  return wallSpanForSide(p, id, wallFaceSign(p, id));
 }
 
 /**

@@ -178,6 +178,27 @@ export function PlanSvg(props: PlanSvgProps) {
         );
       })}
 
+      {/* The centreline, faint inside the band. A wall is three lines: a face each side,
+          which are the edges of the band, and this one between them. */}
+      {showDims &&
+        p.walls.map((w) => {
+          const { a, b } = wallEnds(p, w.id);
+          return (
+            <line
+              key={`${w.id}-centreline`}
+              data-testid="wall-centreline"
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              stroke="rgba(255,255,255,0.45)"
+              strokeWidth={hairline}
+              strokeDasharray={`${10 * mmPerPx} ${7 * mmPerPx}`}
+              style={{ pointerEvents: "none" }}
+            />
+          );
+        })}
+
       {/* A wall lying on top of another has to cut its own gap, or it would paint over
           the opening the other wall already cut and the door would vanish. */}
       {p.walls.flatMap((w) =>

@@ -8,12 +8,12 @@ import { PlanSvg } from "../render/PlanSvg";
 import { ACCENT, GUIDE, NOTIONAL } from "../render/theme";
 import { formatLengthWithUnit } from "../model/units";
 import { useStore } from "../state/store";
-import { resolveSnap, type Guide } from "./snapping";
+import { resolveSnap, type Guide, type SnapKind } from "./snapping";
 import { useViewport } from "./useViewport";
 
-type Draft = { points: Point[]; cursor: Point | null; guides: Guide[] };
+type Draft = { points: Point[]; cursor: Point | null; guides: Guide[]; kind: SnapKind };
 
-const EMPTY: Draft = { points: [], cursor: null, guides: [] };
+const EMPTY: Draft = { points: [], cursor: null, guides: [], kind: "none" };
 
 export function Canvas({ width, height }: { width: number; height: number }) {
   const project = useStore((s) => s.project);
@@ -178,7 +178,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
           draftPoints: d.points,
           mmPerPx: viewport.mmPerPx,
         });
-        return { ...d, cursor: snap.point, guides: snap.guides };
+        return { ...d, cursor: snap.point, guides: snap.guides, kind: snap.kind };
       });
     }
   }
@@ -269,6 +269,34 @@ export function Canvas({ width, height }: { width: number; height: number }) {
           fill={ACCENT}
         />
       ))}
+      {/* Which of a wall's three lines the point caught. A face corner sits only half a
+          thickness from its centreline corner, so without this the two are impossible to
+          tell apart at a glance. */}
+      {draft.cursor && draft.kind !== "none" && (
+        <g data-testid="snap-marker" data-kind={draft.kind}>
+          <circle
+            cx={draft.cursor.x}
+            cy={draft.cursor.y}
+            r={6 * viewport.mmPerPx}
+            fill={draft.kind === "face" ? "none" : ACCENT}
+            stroke={draft.kind === "face" ? GUIDE : ACCENT}
+            strokeWidth={viewport.mmPerPx * 1.5}
+          />
+          {draft.kind === "face" && (
+            <text
+              x={draft.cursor.x}
+              y={draft.cursor.y - 12 * viewport.mmPerPx}
+              fill={GUIDE}
+              fontSize={10 * viewport.mmPerPx}
+              fontFamily="Helvetica, Arial, sans-serif"
+              textAnchor="middle"
+            >
+              face
+            </text>
+          )}
+        </g>
+      )}
+
       {origin && draft.cursor && (
         <text
           data-testid="draft-length"
