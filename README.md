@@ -5,6 +5,8 @@ Measure a flat with a tape, type the numbers in, and export a PDF a builder can 
 [![CI](https://github.com/nhtgl/quickfloorplan/actions/workflows/ci.yml/badge.svg)](https://github.com/nhtgl/quickfloorplan/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+**[Use it now →](https://nhtgl.github.io/quickfloorplan/)**
+
 ## This is not a visualisation tool
 
 It will not show you what your flat looks like. There is no 3D, no rendering, no materials,
@@ -22,6 +24,13 @@ It is meant for people who are not designers, and its output is a starting point
 professional, not a construction drawing.
 
 ## Run it
+
+Nothing to install: **<https://nhtgl.github.io/quickfloorplan/>**
+
+It is the same static build, running entirely in your browser. Your project never leaves
+your machine.
+
+To run it yourself:
 
 ```bash
 docker run -p 8080:8080 ghcr.io/nhtgl/quickfloorplan:latest
