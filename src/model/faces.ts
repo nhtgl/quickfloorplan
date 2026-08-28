@@ -96,3 +96,33 @@ export function wallSideNames(p: Project, id: WallId): { left: string; right: st
     right: names.right[0] ?? fallback.right,
   };
 }
+
+/**
+ * The outline a wall occupies: its two faces joined end to end.
+ *
+ * A wall is drawn from this rather than as a thick line, because neither an off-centre
+ * pair of faces nor a slanted end can be expressed by stroking a centreline.
+ */
+export function wallPolygon(p: Project, id: WallId): Point[] {
+  const left = wallLinePoints(p, id, "left");
+  const right = wallLinePoints(p, id, "right");
+  return [left.from, left.to, right.to, right.from];
+}
+
+/** The two face points directly across the wall from a distance along its centreline. */
+export function wallCrossSection(
+  p: Project,
+  id: WallId,
+  distance: number,
+): { left: Point; right: Point } {
+  const wall = wallById(p, id);
+  const { a, b } = wallEnds(p, id);
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = -(b.y - a.y) / len;
+  const ny = (b.x - a.x) / len;
+  const on = pointAlongWall(p, id, distance);
+  return {
+    left: { x: on.x + nx * wall.offsets.left, y: on.y + ny * wall.offsets.left },
+    right: { x: on.x - nx * wall.offsets.right, y: on.y - ny * wall.offsets.right },
+  };
+}

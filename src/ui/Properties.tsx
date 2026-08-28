@@ -4,14 +4,12 @@ import {
   wallAngleDeg,
   wallHeight,
 } from "../model/geometry";
-import {
-  centrelineForSideLength,
-  wallLengthForSide,
-  wallMeasuredSpan,
-} from "../model/measure";
+import { wallLengthForSide, wallMeasuredSpan } from "../model/measure";
 import {
   addOpeningAtOffset,
   deleteOpening,
+  setWallFaceLength,
+  squareWallEnds,
   deleteRoom,
   deleteWall,
   updateOpening,
@@ -21,7 +19,7 @@ import {
 import { labelOffsetAlongWall } from "../model/openings";
 import { wallOpeningViews } from "../model/sharedOpenings";
 import { wallSideNames } from "../model/faces";
-import { wallThickness } from "../model/walls";
+import { hasSlantedEnds, wallThickness } from "../model/walls";
 import { roomArea } from "../model/rooms";
 import type { Opening, OpeningKind, Project, Wall } from "../model/types";
 import type { Unit } from "../model/units";
@@ -306,19 +304,25 @@ function LengthFields({ wall, unit }: { wall: Wall; unit: Unit }) {
           value={formatLength(wallLengthForSide(project, wall.id, side), unit)}
           onCommit={(v) =>
             apply((p) =>
-              setWallLength(
-                p,
-                wall.id,
-                centrelineForSideLength(p, wall.id, side, parseLength(v, unit)),
-              ),
+              side === 0
+                ? setWallLength(p, wall.id, parseLength(v, unit))
+                : setWallFaceLength(p, wall.id, side, parseLength(v, unit)),
             )
           }
         />
       ))}
       <p className="hint">
-        The three move together. To change the gap between them, adjust a corner or the
-        neighbouring wall's faces.
+        A face length changes that face alone, slanting the end of the wall. The
+        centreline moves the wall itself, and everything beyond it.
       </p>
+      {hasSlantedEnds(wall) && (
+        <button
+          className="link"
+          onClick={() => apply((p) => squareWallEnds(p, wall.id))}
+        >
+          Square the ends again
+        </button>
+      )}
     </section>
   );
 }

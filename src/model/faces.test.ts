@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { chainOfWalls, emptyProject } from "./factory";
-import { updateWall } from "./ops";
-import { allFaceCorners, wallFaceCorners, wallLinePoints, wallSideNames } from "./faces";
+import { setWallFaceLength, squareWallEnds, updateWall } from "./ops";
+import {
+  allFaceCorners,
+  wallFaceCorners,
+  wallLinePoints,
+  wallPolygon,
+  wallSideNames,
+} from "./faces";
 import {
   centrelineForSideLength,
   wallLengthForSide,
@@ -249,5 +255,76 @@ describe("the length of each line", () => {
       wallLengthForSide(next, id, 0) - wallLengthForSide(next, id, 1),
       wallLengthForSide(next, id, -1) - wallLengthForSide(next, id, 0),
     ]).toEqual(gaps);
+  });
+});
+
+describe("faces of different lengths", () => {
+  it("changes only the face that was typed", () => {
+    let p = rect();
+    const id = wall(p, "A");
+    const before = [1, 0, -1].map((s) => wallLengthForSide(p, id, s));
+
+    p = setWallFaceLength(p, id, -1, 4500);
+
+    expect(wallLengthForSide(p, id, -1)).toBe(4500);
+    // The centreline and the inner face are exactly where they were.
+    expect(wallLengthForSide(p, id, 0)).toBe(before[1]);
+    expect(wallLengthForSide(p, id, 1)).toBe(before[0]);
+  });
+
+  it("does not move the wall, so nothing beyond it shifts", () => {
+    let p = rect();
+    const nodes = p.nodes.map((n) => ({ ...n }));
+    p = setWallFaceLength(p, wall(p, "A"), -1, 4500);
+    expect(p.nodes).toEqual(nodes);
+  });
+
+  it("slants the far end, leaving the near end where it was", () => {
+    let p = rect();
+    const id = wall(p, "A");
+    const before = wallLinePoints(p, id, "right");
+    p = setWallFaceLength(p, id, -1, 4500);
+    const after = wallLinePoints(p, id, "right");
+
+    expect(after.from).toEqual(before.from);
+    expect(after.to.x).toBe(before.to.x + 200);
+  });
+
+  it("lets both faces differ from each other and from the centreline", () => {
+    let p = rect();
+    const id = wall(p, "A");
+    p = setWallFaceLength(p, id, 1, 3800);
+    p = setWallFaceLength(p, id, -1, 4600);
+    expect([1, 0, -1].map((s) => wallLengthForSide(p, id, s))).toEqual([3800, 4200, 4600]);
+  });
+
+  it("gives the wall four corners that are no longer a rectangle", () => {
+    let p = rect();
+    const id = wall(p, "A");
+    p = setWallFaceLength(p, id, -1, 4600);
+    const poly = wallPolygon(p, id);
+    expect(poly).toHaveLength(4);
+    // The two faces now end at different distances along the wall.
+    expect(poly[1].x).not.toBe(poly[2].x);
+  });
+
+  it("squares the ends again on request", () => {
+    let p = rect();
+    const id = wall(p, "A");
+    const before = [1, 0, -1].map((s) => wallLengthForSide(p, id, s));
+    p = setWallFaceLength(p, id, -1, 4600);
+    p = squareWallEnds(p, id);
+    expect([1, 0, -1].map((s) => wallLengthForSide(p, id, s))).toEqual(before);
+  });
+
+  it("survives a save and reload", async () => {
+    const { serialize, deserialize } = await import("../file/serialize");
+    let p = rect();
+    p = setWallFaceLength(p, wall(p, "A"), -1, 4600);
+    const result = deserialize(serialize(p));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(wallLengthForSide(result.project, wall(result.project, "A"), -1)).toBe(4600);
+    }
   });
 });

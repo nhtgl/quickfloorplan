@@ -1,5 +1,7 @@
 import { addNode, addWall } from "./factory";
 import { mergeOpenNode, wallEnds, wallLength } from "./geometry";
+import { wallLengthForSide } from "./measure";
+import { wallEndAdjust } from "./walls";
 import { newId } from "./ids";
 import { nextTint } from "../render/theme";
 import { snapToNode } from "../ui/snapping";
@@ -143,4 +145,49 @@ export function deleteOpening(p: Project, id: string): Project {
 
 export function deleteRoom(p: Project, id: string): Project {
   return touch({ ...p, rooms: p.rooms.filter((r) => r.id !== id) });
+}
+
+/**
+ * Set the length of one of a wall's faces, leaving the centreline and the other face
+ * exactly where they are.
+ *
+ * The whole change goes to the wall's far end, so the near end stays put and only that
+ * one face moves. The end stops being square to the wall, which is the point: a wall
+ * whose two faces are different lengths has a slanted end, and real corners are not
+ * always square.
+ *
+ * The centreline is untouched, so nothing downstream of this wall moves either.
+ */
+export function setWallFaceLength(
+  p: Project,
+  id: string,
+  side: number,
+  target: number,
+): Project {
+  const wall = p.walls.find((w) => w.id === id);
+  if (!wall || target <= 0) return p;
+
+  const current = wallLengthForSide(p, id, side);
+  const delta = Math.round(target - current);
+  if (delta === 0) return p;
+
+  const ends = wallEndAdjust(wall);
+  const key = side >= 0 ? "left" : "right";
+  const next = {
+    a: { ...ends.a },
+    b: { ...ends.b, [key]: ends.b[key] + delta },
+  };
+
+  return touch({
+    ...p,
+    walls: p.walls.map((w) => (w.id === id ? { ...w, ends: next } : w)),
+  });
+}
+
+/** Put both ends of a wall back square to it, undoing any slant. */
+export function squareWallEnds(p: Project, id: string): Project {
+  return touch({
+    ...p,
+    walls: p.walls.map((w) => (w.id === id ? { ...w, ends: undefined } : w)),
+  });
 }

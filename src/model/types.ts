@@ -32,11 +32,22 @@ export type PlanNode = {
  */
 export type WallOffsets = { left: number; right: number };
 
+/**
+ * Extra distance along the wall, per face, at one end.
+ *
+ * Zero leaves the face where the corner mitre puts it. Anything else slants that end of
+ * the wall, which is how a wall's two faces come to be different lengths: real corners
+ * are not always square, and each room measures the face it can see.
+ */
+export type EndAdjust = { left: number; right: number };
+
 export type Wall = {
   id: WallId;
   a: NodeId;
   b: NodeId;
   offsets: WallOffsets;
+  /** Face adjustments at each end. Absent means both ends are square to the wall. */
+  ends?: { a: EndAdjust; b: EndAdjust };
   /** mm; falls back to Project.defaultWallHeight */
   height?: number;
   /** "A", "B", ... "Z", "AA"; never reassigned once given out. */

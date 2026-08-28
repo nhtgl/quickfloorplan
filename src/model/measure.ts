@@ -9,7 +9,7 @@ import {
   wallLength,
 } from "./geometry";
 import type { Point, Project, WallId } from "./types";
-import { offsetForSide } from "./walls";
+import { endAdjustForSide, offsetForSide } from "./walls";
 
 /**
  * Which faces a wall's stated length runs between.
@@ -75,6 +75,12 @@ export function wallSpanForSide(p: Project, id: WallId, side: number): Span {
       start = -(side * (half * Math.cos(rad(turn)) - offsetForSide(prev, side))) / sin;
     }
   }
+
+  // A face may also be pushed past its mitre, slanting that end of the wall. This is
+  // what lets the two faces be different lengths from each other.
+  const wall = wallById(p, id);
+  start += endAdjustForSide(wall, "a", side);
+  end += endAdjustForSide(wall, "b", side);
 
   return { start: Math.round(start), end: Math.round(end) };
 }

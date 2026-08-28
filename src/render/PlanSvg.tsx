@@ -16,9 +16,8 @@ import {
   openingPlanSegment,
   wallDimensionChain,
 } from "../model/openings";
-import { pointAlongWall as alongWall } from "../model/geometry";
 import { viewSpan, wallOpeningViews } from "../model/sharedOpenings";
-import { bandShift, wallThickness } from "../model/walls";
+import { wallCrossSection, wallPolygon } from "../model/faces";
 import { edgeHasWallBehind, roomArea } from "../model/rooms";
 import type { Point, Project } from "../model/types";
 import { formatArea, formatDeg, formatLengthWithUnit } from "../model/units";
@@ -53,33 +52,11 @@ export type PlanSvgProps = {
   style?: React.CSSProperties;
 };
 
-/**
- * The band a wall occupies. With faces at independent distances the band is no longer
- * centred on the centreline, so it is drawn along its own middle instead.
- */
-function wallBand(p: Project, id: string): { from: Point; to: Point; width: number } {
-  const wall = p.walls.find((w) => w.id === id)!;
-  const { a, b } = wallEnds(p, id);
-  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-  const nx = (-(b.y - a.y) / len) * bandShift(wall);
-  const ny = ((b.x - a.x) / len) * bandShift(wall);
-  return {
-    from: { x: a.x + nx, y: a.y + ny },
-    to: { x: b.x + nx, y: b.y + ny },
-    width: wallThickness(wall),
-  };
-}
-
-/** A point a measured distance along a wall, moved onto the middle of its band. */
-function shiftAlongBand(p: Project, id: string, distance: number): Point {
-  const wall = p.walls.find((w) => w.id === id)!;
-  const { a, b } = wallEnds(p, id);
-  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-  const on = alongWall(p, id, distance);
-  return {
-    x: on.x + (-(b.y - a.y) / len) * bandShift(wall),
-    y: on.y + ((b.x - a.x) / len) * bandShift(wall),
-  };
+/** The patch of wall an opening removes: straight across, from face to face. */
+function cutPoints(p: Project, wallId: string, from: number, to: number): string {
+  const a = wallCrossSection(p, wallId, from);
+  const b = wallCrossSection(p, wallId, to);
+  return [a.left, b.left, b.right, a.right].map((pt) => `${pt.x},${pt.y}`).join(" ");
 }
 
 function centroid(pts: Point[]): Point {
@@ -187,20 +164,14 @@ export function PlanSvg(props: PlanSvgProps) {
         })}
 
       {p.walls.map((w) => {
-        const band = wallBand(p, w.id);
         const selected = highlightIds.includes(w.id);
         return (
-          <line
+          <polygon
             key={w.id}
             data-testid="wall"
             data-wall-label={w.label}
-            x1={band.from.x}
-            y1={band.from.y}
-            x2={band.to.x}
-            y2={band.to.y}
-            stroke={selected ? ACCENT : WALL}
-            strokeWidth={band.width}
-            strokeLinecap="butt"
+            points={wallPolygon(p, w.id).map((pt) => `${pt.x},${pt.y}`).join(" ")}
+            fill={selected ? ACCENT : WALL}
             onPointerDown={(e) => props.onWallPointerDown?.(w.id, e)}
             onClick={() => props.onPickWall?.(w.id)}
             style={{ cursor: props.onPickWall ? "move" : undefined }}
@@ -236,20 +207,12 @@ export function PlanSvg(props: PlanSvgProps) {
           .filter((view) => !view.own)
           .map((view) => {
             const [start, end] = viewSpan(view);
-            const band = wallBand(p, w.id);
-            const from = shiftAlongBand(p, w.id, start);
-            const to = shiftAlongBand(p, w.id, end);
             return (
-              <line
+              <polygon
                 key={`${w.id}-${view.opening.id}-cut`}
                 data-testid="shared-opening-cut"
-                x1={from.x}
-                y1={from.y}
-                x2={to.x}
-                y2={to.y}
-                stroke={PAPER}
-                strokeWidth={band.width}
-                strokeLinecap="butt"
+                points={cutPoints(p, w.id, start, end)}
+                fill={PAPER}
               />
             );
           }),
@@ -259,26 +222,14 @@ export function PlanSvg(props: PlanSvgProps) {
       {p.openings.map((o) => {
         const seg = openingPlanSegment(p, o.id);
         const wall = p.walls.find((w) => w.id === o.wallId)!;
-        const band = wallBand(p, wall.id);
-        const cut = {
-          from: shiftAlongBand(p, wall.id, viewSpan({ opening: o, own: true, offset: o.offset })[0]),
-          to: shiftAlongBand(p, wall.id, viewSpan({ opening: o, own: true, offset: o.offset })[1]),
-        };
+        const [cutStart, cutEnd] = viewSpan({ opening: o, own: true, offset: o.offset });
         const arc = doorSwingArc(p, o.id);
         const alert = alertIds.includes(o.id);
         const selected = highlightIds.includes(o.id);
         const colour = alert ? ALERT : selected ? ACCENT : WALL;
         return (
           <g key={o.id} data-testid="opening" data-opening-kind={o.kind}>
-            <line
-              x1={cut.from.x}
-              y1={cut.from.y}
-              x2={cut.to.x}
-              y2={cut.to.y}
-              stroke={PAPER}
-              strokeWidth={band.width}
-              strokeLinecap="butt"
-            />
+            <polygon points={cutPoints(p, wall.id, cutStart, cutEnd)} fill={PAPER} />
             {o.kind === "window" && (
               <line
                 data-testid="window-symbol"
@@ -315,7 +266,7 @@ export function PlanSvg(props: PlanSvgProps) {
               x2={seg.to.x}
               y2={seg.to.y}
               stroke="transparent"
-              strokeWidth={Math.max(band.width, 8 * mmPerPx)}
+              strokeWidth={Math.max(wall.offsets.left + wall.offsets.right, 8 * mmPerPx)}
               onClick={() => props.onPickOpening?.(o.id)}
               style={{ cursor: props.onPickOpening ? "pointer" : undefined }}
             />

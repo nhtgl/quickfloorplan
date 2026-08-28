@@ -257,15 +257,16 @@ describe("measuring from inside or outside", () => {
     const wallId = useStore.getState().project.walls[0].id;
     act(() => useStore.getState().select({ kind: "wall", id: wallId }));
 
+    const before = wallLength(useStore.getState().project, wallId);
     const input = await screen.findByLabelText("Inside face");
     await userEvent.clear(input);
     await userEvent.type(input, "410");
     fireEvent.blur(input);
 
     const p = useStore.getState().project;
-    // That face is the inside of this room, so the centreline is a thickness longer.
-    expect(wallLength(p, wallId)).toBe(4200);
+    // The inside face is now exactly what was typed, and the wall itself has not moved.
     expect(wallMeasuredLength(p, wallId)).toBe(4100);
+    expect(wallLength(p, wallId)).toBe(before);
   });
 
   it("relabels the field when measuring from outside", async () => {
@@ -1165,7 +1166,7 @@ describe("editing a wall's lengths", () => {
     expect(wallLengthForSide(useStore.getState().project, id, -1)).toBe(4500);
   });
 
-  it("shifts the other two lines by the same amount, keeping the wall square", async () => {
+  it("leaves the other two lines exactly as they were", async () => {
     const id = await selectedWall();
     const before = [1, 0, -1].map((s) => wallLengthForSide(useStore.getState().project, id, s));
 
@@ -1175,7 +1176,33 @@ describe("editing a wall's lengths", () => {
     fireEvent.blur(field);
 
     const after = [1, 0, -1].map((s) => wallLengthForSide(useStore.getState().project, id, s));
-    const shifts = new Set(after.map((v, i) => v - before[i]));
-    expect(shifts.size).toBe(1);
+    expect(after[0]).toBe(3500);
+    expect(after[1]).toBe(before[1]);
+    expect(after[2]).toBe(before[2]);
+  });
+
+  it("offers to square the ends again once a face has been changed", async () => {
+    const id = await selectedWall();
+    const field = await screen.findByLabelText("Study face");
+    await userEvent.clear(field);
+    await userEvent.type(field, "350");
+    fireEvent.blur(field);
+
+    act(() => useStore.getState().select({ kind: "wall", id }));
+    await userEvent.click(await screen.findByRole("button", { name: "Square the ends again" }));
+    expect(wallLengthForSide(useStore.getState().project, id, 1)).not.toBe(3500);
+  });
+
+  it("the centreline still moves the wall itself", async () => {
+    const id = await selectedWall();
+    const before = useStore.getState().project.nodes.map((n) => ({ ...n }));
+
+    const field = await screen.findByLabelText("Centreline");
+    await userEvent.clear(field);
+    await userEvent.type(field, "350");
+    fireEvent.blur(field);
+
+    expect(useStore.getState().project.nodes).not.toEqual(before);
+    expect(wallLengthForSide(useStore.getState().project, id, 0)).toBe(3500);
   });
 });

@@ -230,7 +230,13 @@ await page.waitForTimeout(150);
 const linesAfter = await page
   .locator('[data-testid="wall-lengths"] input')
   .evaluateAll((els) => els.map((e) => Number(e.value)));
-const shifts = new Set(linesAfter.map((v, i) => v - linesBefore[i]));
+// The wall outline should now have its two faces ending at different points.
+const slantedCorners = await page.evaluate(() => {
+  const poly = document.querySelector('.stage [data-wall-label="A"]');
+  const pts = poly.getAttribute("points").split(" ").map((s) => s.split(",").map(Number));
+  // Corner 2 is the far end of the left face, corner 3 the far end of the right face.
+  return pts[1][0] !== pts[2][0] || pts[1][1] !== pts[2][1];
+});
 const beforeFaces = await page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
   return raw.walls.find((w) => w.label === "A").offsets;
@@ -398,7 +404,8 @@ const checks = [
   ["each face has its own field", faceFields === 2],
   ["each of the three lines has its own length field", lengthFields === 3],
   ["the lines are named, not just left and right", lengthLabels.includes("Centreline")],
-  ["typing one length shifts all three by the same amount", shifts.size === 1 && [...shifts][0] !== 0],
+  ["typing one face length leaves the other two lines alone", linesAfter[2] === 450 && linesAfter[0] === linesBefore[0] && linesAfter[1] === linesBefore[1]],
+  ["a wall with different face lengths is drawn as a slanted outline", slantedCorners === true],
   ["editing one face leaves the other alone", afterFaces.left === 300 && afterFaces.right === beforeFaces.right],
   ["drawing catches a wall face, not only its centreline", snapKind === "face"],
   ["no page or console errors", problems.length === 0],

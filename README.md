@@ -83,9 +83,11 @@ Select any wall to type **a length for each of its three lines** — the face on
 the centreline between them — its angle to the previous wall, a height override, and **the
 position of each of its two faces separately**.
 
-Which length you type says which line you measured, and the three move together: the gaps
-between them are set by the corners and by the neighbouring walls' faces, not by how long
-this wall is. To change the gap, adjust a corner or the neighbour's faces. A wall is not one centred thickness: the faces are what get measured, and they move on their
+The three are independent. Typing a **face** length changes that face and nothing else,
+slanting the end of the wall — which is what a wall whose two sides measure differently
+actually looks like, and real corners are not always square. Typing the **centreline** moves
+the wall itself, and everything beyond it along the run. A wall whose ends have been slanted
+offers to square them again. A wall is not one centred thickness: the faces are what get measured, and they move on their
 own. Correcting the
 thickness of a wall you have already measured one room against would otherwise shift that
 room's face too. Each field is named after what lies on that side, so you set "the kitchen
