@@ -13,7 +13,11 @@ const RECT: Point[] = [
   { x: 0, y: 3100 },
 ];
 
-const base = (): Project => chainOfWalls(emptyProject("Flat"), RECT, true);
+/** Measured on centrelines so the expected numbers are the raw geometry. */
+const base = (): Project => ({
+  ...chainOfWalls(emptyProject("Flat"), RECT, true),
+  measureFrom: "centre",
+});
 
 describe("PlanSvg", () => {
   it("draws one line per wall, labelled", () => {
@@ -44,6 +48,27 @@ describe("PlanSvg", () => {
       (n) => n.textContent,
     );
     expect(labels).toContain("4.20 m");
+  });
+
+  it("states inside-face lengths when the project measures from inside", () => {
+    const p: Project = { ...base(), measureFrom: "inside" };
+    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
+    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
+      (n) => n.textContent,
+    );
+    // 100 thick walls take 50 off each end of the 4200 and 3100 centrelines.
+    expect(labels).toContain("410 cm");
+    expect(labels).toContain("300 cm");
+  });
+
+  it("states outside-face lengths when the project measures from outside", () => {
+    const p: Project = { ...base(), measureFrom: "outside" };
+    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
+    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
+      (n) => n.textContent,
+    );
+    expect(labels).toContain("430 cm");
+    expect(labels).toContain("320 cm");
   });
 
   it("draws a setting-out chain beside the overall length once a wall has an opening", () => {

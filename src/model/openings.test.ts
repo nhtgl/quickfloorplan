@@ -5,8 +5,9 @@ import { doorSwingArc, openingPlanSegment, openingRect } from "./openings";
 import { projectWarnings } from "./validate";
 import type { Opening, Project } from "./types";
 
+/** Closed rectangle measured on its centrelines, so chain numbers are the raw geometry. */
 function wallProject(): Project {
-  return chainOfWalls(
+  return centreMeasured(chainOfWalls(
     emptyProject("t"),
     [
       { x: 0, y: 0 },
@@ -15,7 +16,11 @@ function wallProject(): Project {
       { x: 0, y: 3100 },
     ],
     true,
-  );
+  ));
+}
+
+function centreMeasured(p: Project): Project {
+  return { ...p, measureFrom: "centre" };
 }
 
 function withOpening(p: Project, o: Partial<Opening>): { project: Project; id: string } {
@@ -170,6 +175,23 @@ describe("labelOffsetAlongWall", () => {
 });
 
 describe("wallDimensionChain", () => {
+  it("tiles the inside faces when the project measures from inside", async () => {
+    const { wallDimensionChain } = await import("./openings");
+    const { wallMeasuredLength } = await import("./measure");
+    const inside: Project = { ...withOpening(wallProject(), { offset: 1500, width: 1200 }).project, measureFrom: "inside" };
+    const wallId = inside.walls[0].id;
+    const chain = wallDimensionChain(inside, wallId);
+    // Each end loses half the neighbouring wall's thickness.
+    expect(chain.map((c) => [c.kind, c.end - c.start])).toEqual([
+      ["solid", 850],
+      ["opening", 1200],
+      ["solid", 2050],
+    ]);
+    expect(chain.reduce((n, c) => n + (c.end - c.start), 0)).toBe(
+      wallMeasuredLength(inside, wallId),
+    );
+  });
+
   it("is a single run for a bare wall", async () => {
     const { wallDimensionChain } = await import("./openings");
     const p = wallProject();

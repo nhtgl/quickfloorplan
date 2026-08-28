@@ -37,7 +37,7 @@ export function wallHeight(p: Project, id: WallId): number {
  * measurement must see through the split, or a broken loop would also lose track of
  * which walls are neighbours.
  */
-function resolve(p: Project, id: NodeId): NodeId {
+export function resolveNode(p: Project, id: NodeId): NodeId {
   const n = p.nodes.find((x) => x.id === id);
   return n?.openFrom ?? id;
 }
@@ -51,7 +51,7 @@ export function chainFrom(p: Project, id: WallId, stopBefore?: WallId): WallId[]
   const seen = new Set<WallId>([id]);
   let current = wallById(p, id);
   for (;;) {
-    const next = p.walls.find((w) => resolve(p, current.b) === w.a && !seen.has(w.id));
+    const next = p.walls.find((w) => resolveNode(p, current.b) === w.a && !seen.has(w.id));
     if (!next || next.id === stopBefore) return out;
     out.push(next.id);
     seen.add(next.id);
@@ -62,7 +62,7 @@ export function chainFrom(p: Project, id: WallId, stopBefore?: WallId): WallId[]
 /** The wall immediately upstream, or null at the head of an open chain. */
 export function previousWall(p: Project, id: WallId): Wall | null {
   const w = wallById(p, id);
-  return p.walls.find((x) => resolve(p, x.b) === w.a && x.id !== w.id) ?? null;
+  return p.walls.find((x) => resolveNode(p, x.b) === w.a && x.id !== w.id) ?? null;
 }
 
 /**
@@ -228,4 +228,31 @@ export function pointAlongWall(p: Project, id: WallId, distance: number): Point 
     x: a.x + ((b.x - a.x) / len) * distance,
     y: a.y + ((b.y - a.y) / len) * distance,
   };
+}
+
+/** The wall immediately downstream, or null at the end of an open chain. */
+export function nextWall(p: Project, id: WallId): Wall | null {
+  const w = wallById(p, id);
+  return p.walls.find((x) => x.a === resolveNode(p, w.b) && x.id !== w.id) ?? null;
+}
+
+/**
+ * Signed area of the loop this wall belongs to, or null if the wall is not part of a
+ * closed run. The sign says which way the loop winds, which is the only way to know
+ * which side of a wall is the inside.
+ */
+export function loopSignedArea(p: Project, id: WallId): number | null {
+  const chain = [id, ...chainFrom(p, id)];
+  const last = wallById(p, chain[chain.length - 1]);
+  const first = wallById(p, id);
+  if (resolveNode(p, last.b) !== first.a) return null;
+
+  const pts = chain.map((wid) => nodeById(p, wallById(p, wid).a));
+  let sum = 0;
+  for (let i = 0; i < pts.length; i += 1) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return sum / 2;
 }

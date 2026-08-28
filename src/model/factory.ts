@@ -1,5 +1,6 @@
 import { newId, nextWallLabel } from "./ids";
 import { SCHEMA, type PlanNode, type Point, type Project, type Wall } from "./types";
+import { DEFAULT_MEASURE } from "./measure";
 import { DEFAULT_UNIT, type Unit } from "./units";
 
 export function emptyProject(name = "Untitled"): Project {
@@ -8,6 +9,7 @@ export function emptyProject(name = "Untitled"): Project {
     schema: SCHEMA,
     name,
     units: DEFAULT_UNIT,
+    measureFrom: DEFAULT_MEASURE,
     defaultWallHeight: 2600,
     nodes: [],
     walls: [],

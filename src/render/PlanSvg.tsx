@@ -8,6 +8,7 @@ import {
   wallLength,
 } from "../model/geometry";
 import { projectUnit } from "../model/factory";
+import { wallMeasuredLength, wallMeasuredSpan } from "../model/measure";
 import {
   doorSwingArc,
   labelOffsetAlongWall,
@@ -233,6 +234,7 @@ export function PlanSvg(props: PlanSvgProps) {
       {showDims &&
         p.walls.map((w) => {
           const { a, b } = wallEnds(p, w.id);
+          const span = wallMeasuredSpan(p, w.id);
           const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
           // Push the dimensions to whichever side faces away from the plan's middle.
           const nx = -(b.y - a.y);
@@ -260,9 +262,9 @@ export function PlanSvg(props: PlanSvgProps) {
                 ))}
               {/* Overall length sits outside the chain, the way a builder reads it. */}
               <DimLine
-                from={{ x: a.x, y: a.y }}
-                to={{ x: b.x, y: b.y }}
-                label={formatLengthWithUnit(wallLength(p, w.id), unit)}
+                from={pointAlongWall(p, w.id, span.start)}
+                to={pointAlongWall(p, w.id, span.end)}
+                label={formatLengthWithUnit(wallMeasuredLength(p, w.id), unit)}
                 offset={outward * (hasOpenings ? 52 : 22) * mmPerPx}
                 mmPerPx={mmPerPx}
               />

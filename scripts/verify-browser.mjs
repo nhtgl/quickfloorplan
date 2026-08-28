@@ -31,6 +31,7 @@ const project = {
   schema: "quickfloorplan/1",
   name: "Verification Flat",
   units: "cm",
+  measureFrom: "inside",
   defaultWallHeight: 2600,
   nodes: [
     { id: "n1", x: 0, y: 0 },
@@ -97,6 +98,12 @@ await page.screenshot({ path: join(OUT, "wall-selected.png") });
 
 const dimLabels = await page.locator('[data-testid="dim-label"]').allTextContents();
 const chainSegs = await page.locator('[data-kind="opening"]').count();
+// Wall A's chain is the first five labels; they must add up to its stated length.
+const chainSum = (await page.locator('[data-kind]').evaluateAll((els) =>
+  els
+    .slice(0, 5)
+    .map((e) => Number((e.querySelector("text")?.textContent ?? "0").replace(/[^0-9.-]/g, ""))),
+)).reduce((a, b) => a + b, 0);
 const zoomIn = await page.getByRole("button", { name: "Zoom in" }).count();
 const fitBtn = await page.getByRole("button", { name: "Fit plan to view" }).count();
 const panTool = await page.getByRole("button", { name: "Pan" }).count();
@@ -124,7 +131,10 @@ const checks = [
   ["PDF larger than 5kB", pdf.length > 5000],
   ["wall A panel lists its 2 windows", openingRows.length === 2 && openingRows.every((t) => t.includes("Window"))],
   ["zoom, fit and pan controls present", zoomIn === 1 && fitBtn === 1 && panTool === 1],
-  ["dimensions read in centimetres", dimLabels.includes("520 cm") && !dimLabels.some((t) => t.includes(" m"))],
+  // Centrelines are 520 x 340 with 12cm walls, so inside faces read 508 x 328.
+  ["wall lengths read from inside faces", dimLabels.includes("508 cm") && dimLabels.includes("328 cm")],
+  ["dimensions read in centimetres", !dimLabels.some((t) => t.includes(" m"))],
+  ["chain sums to the inside length", chainSum === 508],
   ["setting-out chain marks each opening", chainSegs === 4],
   ["no page or console errors", problems.length === 0],
 ];

@@ -1,4 +1,5 @@
 import { wallById, wallEnds, wallLength } from "./geometry";
+import { wallMeasuredSpan } from "./measure";
 import type { OpeningId, Point, Project } from "./types";
 
 export function openingById(p: Project, id: OpeningId) {
@@ -120,8 +121,8 @@ export type ChainSegment = {
  * than none. The overlap itself is already reported as a warning.
  */
 export function wallDimensionChain(p: Project, wallId: string): ChainSegment[] {
-  const len = wallLength(p, wallId);
-  const clamp = (v: number) => Math.max(0, Math.min(len, v));
+  const span = wallMeasuredSpan(p, wallId);
+  const clamp = (v: number) => Math.max(span.start, Math.min(span.end, v));
 
   const spans = p.openings
     .filter((o) => o.wallId === wallId)
@@ -145,7 +146,7 @@ export function wallDimensionChain(p: Project, wallId: string): ChainSegment[] {
   }
 
   const out: ChainSegment[] = [];
-  let cursor = 0;
+  let cursor = span.start;
   for (const m of merged) {
     if (m.start > cursor) {
       out.push({ start: cursor, end: m.start, kind: "solid", openingIds: [] });
@@ -153,6 +154,8 @@ export function wallDimensionChain(p: Project, wallId: string): ChainSegment[] {
     out.push({ start: m.start, end: m.end, kind: "opening", openingIds: m.ids });
     cursor = m.end;
   }
-  if (len > cursor) out.push({ start: cursor, end: len, kind: "solid", openingIds: [] });
+  if (span.end > cursor) {
+    out.push({ start: cursor, end: span.end, kind: "solid", openingIds: [] });
+  }
   return out;
 }

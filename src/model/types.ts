@@ -1,3 +1,4 @@
+import type { MeasureFrom } from "./measure";
 import type { Unit } from "./units";
 
 export type NodeId = string;
@@ -64,6 +65,8 @@ export type Project = {
   name: string;
   /** Display unit. Absent in older files, which read as centimetres. */
   units?: Unit;
+  /** Which faces stated wall lengths run between. Absent reads as inside faces. */
+  measureFrom?: MeasureFrom;
   /** mm */
   defaultWallHeight: number;
   nodes: PlanNode[];

@@ -30,6 +30,16 @@ Measurements are in **centimetres** by default, which is how a tape gets read an
 down. The Units control in the toolbar switches the whole project to metres. Room areas stay
 in m² either way, because a room in square centimetres is a six-digit number nobody can read.
 
+Walls are drawn on their centrelines, but a stated length can run between whichever faces
+you actually measured. The **Measure** control offers **inside faces** (the default, since a
+tape held across a room gives the clear internal distance), **centrelines**, or **outside
+faces**. Type the number you measured and the tool works out where the centreline has to go.
+
+At a corner a wall's face stops where it meets its neighbour's, so the correction uses the
+neighbour's thickness and the angle between them — half a thickness at a square corner, more
+at a sharp one. A wall that is not part of a closed run has no inside, so it falls back to
+its centreline rather than inventing a side.
+
 Zoom and fit buttons sit at the bottom right of the canvas. The **Pan** tool drags the view,
 and shift-drag or middle-drag pans with any tool selected.
 
@@ -68,7 +78,8 @@ door swings drawn. Then one page per wall, titled with the rooms it faces ("Wall
 Any wall with an opening in it carries a **setting-out chain**: corner to the first opening,
 the opening itself, the solid stretch to the next, and so on to the far corner, with the
 overall length outside it. The segments tile the wall end to end, so the chain adds up to the
-overall — which is what lets someone check it against a tape on site. Openings are picked out
+overall — which is what lets someone check it against a tape on site. The chain runs between
+the same faces as the overall, so switching between inside and outside moves both together. Openings are picked out
 in blue. Overlapping openings are merged into one segment rather than listed separately: a
 chain that does not add up is worse than no chain, and the overlap is already flagged as a
 warning.

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import App from "../App";
 import { emptyProject } from "../model/factory";
 import { loopGap, wallLength } from "../model/geometry";
+import { wallMeasuredLength } from "../model/measure";
 import { roomArea } from "../model/rooms";
 import { useStore } from "../state/store";
 
@@ -15,7 +16,8 @@ function clickPlan(x: number, y: number) {
 
 beforeEach(() => {
   localStorage.clear();
-  act(() => useStore.getState().reset(emptyProject("Test flat")));
+  // Most flows assert raw geometry, so measure on centrelines unless a test says otherwise.
+  act(() => useStore.getState().reset({ ...emptyProject("Test flat"), measureFrom: "centre" }));
   // jsdom gives every element a zero-sized box, so the canvas needs a usable size.
   Object.defineProperty(HTMLElement.prototype, "clientWidth", { value: 900, configurable: true });
   Object.defineProperty(HTMLElement.prototype, "clientHeight", { value: 600, configurable: true });
@@ -232,6 +234,46 @@ describe("units", () => {
     await userEvent.type(input, "3.15");
     fireEvent.blur(input);
     expect(wallLength(useStore.getState().project, wallId)).toBe(3150);
+  });
+});
+
+describe("measuring from inside or outside", () => {
+  it("shows the inside face length and accepts a typed inside measurement", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    clickPlan(600, 400);
+    clickPlan(200, 400);
+    clickPlan(200, 150);
+
+    await userEvent.selectOptions(screen.getByLabelText("Measure walls from"), "inside");
+    const wallId = useStore.getState().project.walls[0].id;
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+
+    const input = await screen.findByLabelText(/Length \(inside\)/);
+    await userEvent.clear(input);
+    await userEvent.type(input, "410");
+    fireEvent.blur(input);
+
+    const p = useStore.getState().project;
+    // Typing the inside measurement leaves a centreline 100mm longer, one wall thickness.
+    expect(wallLength(p, wallId)).toBe(4200);
+    expect(wallMeasuredLength(p, wallId)).toBe(4100);
+  });
+
+  it("relabels the field when measuring from outside", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    clickPlan(600, 400);
+    clickPlan(200, 150);
+
+    await userEvent.selectOptions(screen.getByLabelText("Measure walls from"), "outside");
+    const wallId = useStore.getState().project.walls[0].id;
+    act(() => useStore.getState().select({ kind: "wall", id: wallId }));
+    expect(await screen.findByLabelText(/Length \(outside\)/)).toBeInTheDocument();
   });
 });
 

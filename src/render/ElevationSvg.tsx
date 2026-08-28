@@ -1,5 +1,6 @@
-import { wallById, wallHeight, wallLength } from "../model/geometry";
+import { wallById, wallHeight } from "../model/geometry";
 import { projectUnit } from "../model/factory";
+import { wallMeasuredLength, wallMeasuredSpan } from "../model/measure";
 import { openingRect, wallDimensionChain } from "../model/openings";
 import type { Project, WallId } from "../model/types";
 import { formatLengthWithUnit } from "../model/units";
@@ -32,7 +33,10 @@ const KIND_LABEL: Record<string, string> = {
 export function ElevationSvg(props: ElevationSvgProps) {
   const { project: p, wallId, width, height, highlightIds = [], alertIds = [] } = props;
   const wall = wallById(p, wallId);
-  const len = wallLength(p, wallId);
+  // The drawing shows the measured face, so x runs from that face's start, not the node.
+  const span = wallMeasuredSpan(p, wallId);
+  const len = wallMeasuredLength(p, wallId);
+  const along = (centrelineDistance: number) => centrelineDistance - span.start;
   const h = wallHeight(p, wallId);
   const openings = p.openings.filter((o) => o.wallId === wallId);
   const unit = projectUnit(p);
@@ -71,7 +75,8 @@ export function ElevationSvg(props: ElevationSvgProps) {
       />
 
       {openings.map((o) => {
-        const r = openingRect(p, o.id);
+        const raw = openingRect(p, o.id);
+        const r = { ...raw, x: along(raw.x) };
         const alert = alertIds.includes(o.id);
         const selected = highlightIds.includes(o.id);
         const colour = alert ? ALERT : selected ? ACCENT : WALL;
@@ -125,8 +130,8 @@ export function ElevationSvg(props: ElevationSvgProps) {
           <DimLine
             key={seg.start}
             data-kind={seg.kind}
-            from={{ x: seg.start, y: up(0) }}
-            to={{ x: seg.end, y: up(0) }}
+            from={{ x: along(seg.start), y: up(0) }}
+            to={{ x: along(seg.end), y: up(0) }}
             label={formatLengthWithUnit(Math.round(seg.end - seg.start), unit)}
             offset={26 * mmPerPx}
             mmPerPx={mmPerPx}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { emptyProject } from "../model/factory";
 import { formatLength, parseLength, stepFor, type Unit } from "../model/units";
 import { projectUnit } from "../model/factory";
+import { projectMeasureFrom, type MeasureFrom } from "../model/measure";
 import { openProject, saveProject } from "../file/io";
 import { exportPdf, pdfFileName } from "../export/pdf";
 import { useStore, type Tool } from "../state/store";
@@ -26,6 +27,7 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
   const redo = useStore((s) => s.redo);
   const [busy, setBusy] = useState(false);
   const unit = projectUnit(project);
+  const measureFrom = projectMeasureFrom(project);
 
   async function doExport() {
     setBusy(true);
@@ -94,6 +96,22 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
         >
           <option value="cm">cm</option>
           <option value="m">m</option>
+        </select>
+      </label>
+
+      <label className="field inline">
+        <span>Measure</span>
+        <select
+          aria-label="Measure walls from"
+          value={measureFrom}
+          onChange={(e) =>
+            apply((p) => ({ ...p, measureFrom: e.currentTarget.value as MeasureFrom }))
+          }
+          title="Which faces a wall's stated length runs between"
+        >
+          <option value="inside">Inside faces</option>
+          <option value="centre">Centrelines</option>
+          <option value="outside">Outside faces</option>
         </select>
       </label>
 

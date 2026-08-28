@@ -3,8 +3,13 @@ import {
   setWallLength,
   wallAngleDeg,
   wallHeight,
-  wallLength,
 } from "../model/geometry";
+import {
+  centrelineForMeasured,
+  projectMeasureFrom,
+  wallMeasuredLength,
+  wallMeasuredSpan,
+} from "../model/measure";
 import {
   addOpeningAtOffset,
   deleteOpening,
@@ -84,10 +89,14 @@ export function Properties() {
       <aside className="panel">
         <h2>Wall {wall.label}</h2>
         <NumberField
-          label="Length"
+          label={LENGTH_LABEL[projectMeasureFrom(project)]}
           {...num}
-          value={formatLength(wallLength(project, wall.id), unit)}
-          onCommit={(v) => apply((p) => setWallLength(p, wall.id, parseLength(v, unit)))}
+          value={formatLength(wallMeasuredLength(project, wall.id), unit)}
+          onCommit={(v) =>
+            apply((p) =>
+              setWallLength(p, wall.id, centrelineForMeasured(p, wall.id, parseLength(v, unit))),
+            )
+          }
         />
         {angle !== null && (
           <NumberField
@@ -138,6 +147,8 @@ export function Properties() {
     if (!o) return null;
     const wall = project.walls.find((w) => w.id === o.wallId)!;
     const patch = (d: Partial<Opening>) => apply((p) => updateOpening(p, o.id, d));
+    // Offsets read from the same face the wall's own length is measured from.
+    const faceStart = wallMeasuredSpan(project, wall.id).start;
     return (
       <aside className="panel">
         <h2>
@@ -166,8 +177,8 @@ export function Properties() {
         <NumberField
           label={`From end ${wall.label} (to centre)`}
           {...num}
-          value={formatLength(o.offset, unit)}
-          onCommit={(v) => patch({ offset: parseLength(v, unit) })}
+          value={formatLength(o.offset - faceStart, unit)}
+          onCommit={(v) => patch({ offset: parseLength(v, unit) + faceStart })}
         />
         <NumberField
           label="Width"
@@ -290,6 +301,12 @@ function NodePanel({ project, nodeId }: { project: Project; nodeId: string }) {
   );
 }
 
+const LENGTH_LABEL: Record<string, string> = {
+  inside: "Length (inside)",
+  centre: "Length (centre)",
+  outside: "Length (outside)",
+};
+
 const KIND_NAME: Record<OpeningKind, string> = {
   door: "Door",
   window: "Window",
@@ -307,6 +324,7 @@ function OpeningList({ wallId, wallLabel }: { wallId: string; wallLabel: string 
   const select = useStore((s) => s.select);
 
   const unit = projectUnit(project);
+  const faceStart = wallMeasuredSpan(project, wallId).start;
   const openings = project.openings
     .filter((o) => o.wallId === wallId)
     .sort((a, b) => a.offset - b.offset);
@@ -339,7 +357,7 @@ function OpeningList({ wallId, wallLabel }: { wallId: string; wallLabel: string 
             >
               <strong>{KIND_NAME[o.kind]}</strong>
               <span>
-                {formatLength(o.offset, unit)} {unit} from {wallLabel} ·{" "}
+                {formatLength(o.offset - faceStart, unit)} {unit} from {wallLabel} ·{" "}
                 {formatLength(o.width, unit)} × {formatLength(o.height, unit)} {unit}
                 {o.sill > 0 ? ` · sill ${formatLength(o.sill, unit)} ${unit}` : ""}
               </span>
