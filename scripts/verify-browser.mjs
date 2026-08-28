@@ -234,6 +234,38 @@ const storedPhoto = await page.evaluate(() => {
 await page.screenshot({ path: join(OUT, "photos-dialog.png") });
 await page.getByRole("button", { name: "Done" }).click();
 
+// Drag the typed room onto the flat and check it snaps flush.
+await page.getByRole("button", { name: "Select" }).click();
+const roomEdges = () =>
+  page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
+    const ids = new Set(
+      raw.walls.filter((w) => ["E", "F", "G", "H"].includes(w.label)).flatMap((w) => [w.a, w.b]),
+    );
+    const xs = raw.nodes.filter((n) => ids.has(n.id)).map((n) => n.x);
+    const others = raw.nodes.filter((n) => !ids.has(n.id)).map((n) => n.x);
+    return { movingLeft: Math.min(...xs), stationaryRight: Math.max(...others) };
+  });
+
+const edgesBefore = await roomEdges();
+const movingWall = page.locator('[data-wall-label="E"]').first();
+const grab = await movingWall.boundingBox();
+await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2);
+await page.mouse.down();
+// Aim the room's left edge at the other room's right edge, a shade short of it.
+const svgScale = await page.evaluate(() => {
+  const svg = document.querySelector('[data-testid="plan-svg"]');
+  const box = svg.getBoundingClientRect();
+  return svg.viewBox.baseVal.width / box.width;
+});
+const wantedPx = (edgesBefore.stationaryRight - edgesBefore.movingLeft) / svgScale + 3;
+await page.mouse.move(grab.x + grab.width / 2 + wantedPx, grab.y + grab.height / 2, { steps: 8 });
+const dragGuides = await page.locator('[data-testid="align-guide"]').count();
+await page.mouse.up();
+await page.waitForTimeout(150);
+const edgesAfter = await roomEdges();
+await page.screenshot({ path: join(OUT, "rooms-snapped.png") });
+
 const [download] = await Promise.all([
   page.waitForEvent("download", { timeout: 60000 }),
   page.getByRole("button", { name: "Export PDF" }).click(),
@@ -271,6 +303,8 @@ const checks = [
   // 2400x1800 source, scaled to fit a 1400px box and re-encoded as JPEG.
   ["photos are downscaled and re-encoded", storedPhoto.w === 1400 && storedPhoto.h === 1050 && storedPhoto.jpeg],
   ["PDF gains a sketch page and a photo page", pages === 11],
+  ["dragging a room shows a snap guide", dragGuides > 0],
+  ["the dragged room lands flush against the other", edgesAfter.movingLeft === edgesAfter.stationaryRight],
   ["no page or console errors", problems.length === 0],
 ];
 

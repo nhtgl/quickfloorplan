@@ -6,6 +6,7 @@ import { emptyProject } from "../model/factory";
 import { loopGap, wallLength } from "../model/geometry";
 import { wallMeasuredLength } from "../model/measure";
 import { addPhoto, makePhoto } from "../model/photos";
+import { loopNodeIds, moveLoop } from "../model/loops";
 import { pageTitles } from "../export/pageTitles";
 import { roomArea } from "../model/rooms";
 import { useStore } from "../state/store";
@@ -684,5 +685,182 @@ describe("the sketch page", () => {
       "Floor Plan",
       "Sketch Plan",
     ]);
+  });
+});
+
+describe("moving a whole room", () => {
+  /** Two rooms built from typed sizes, the second placed clear of the first. */
+  async function twoRooms() {
+    render(<App />);
+    for (const sizes of ["400,90,300,90,400,90,300,90", "250,90,200,90,250,90,200,90"]) {
+      await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+      await userEvent.type(screen.getByTestId("measurements-input"), sizes);
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    }
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+  }
+
+  const wallEl = (label: string) =>
+    screen.getAllByTestId("wall").find((w) => w.getAttribute("data-wall-label") === label)!;
+
+  const loopXs = (label: string) => {
+    const p = useStore.getState().project;
+    const id = p.walls.find((w) => w.label === label)!.id;
+    const ids = new Set(loopNodeIds(p, id));
+    return p.nodes.filter((n) => ids.has(n.id)).map((n) => n.x);
+  };
+
+  it("drags every wall of a room together", async () => {
+    await twoRooms();
+    const svg = screen.getByTestId("plan-svg");
+    const before = loopXs("E");
+
+    fireEvent.pointerDown(wallEl("E"), { clientX: 400, clientY: 200, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 360, clientY: 230 });
+    fireEvent.pointerUp(svg, { clientX: 360, clientY: 230 });
+
+    const after = loopXs("E");
+    // Every corner shifted by the same amount, so the room kept its shape.
+    const shifts = new Set(after.map((x, i) => x - before[i]));
+    expect(shifts.size).toBe(1);
+    expect([...shifts][0]).not.toBe(0);
+  });
+
+  it("leaves the other room where it was", async () => {
+    await twoRooms();
+    const svg = screen.getByTestId("plan-svg");
+    const before = loopXs("A");
+
+    fireEvent.pointerDown(wallEl("E"), { clientX: 400, clientY: 200, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 340, clientY: 260 });
+    fireEvent.pointerUp(svg, { clientX: 340, clientY: 260 });
+
+    expect(loopXs("A")).toEqual(before);
+  });
+
+  it("takes the room's tint along with its walls", async () => {
+    await twoRooms();
+    const svg = screen.getByTestId("plan-svg");
+    const before = useStore.getState().project.rooms[1].polygon[0].x;
+
+    fireEvent.pointerDown(wallEl("E"), { clientX: 400, clientY: 200, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 350, clientY: 200 });
+    fireEvent.pointerUp(svg, { clientX: 350, clientY: 200 });
+
+    expect(useStore.getState().project.rooms[1].polygon[0].x).not.toBe(before);
+  });
+
+  it("snaps the moved room exactly onto the other one", async () => {
+    await twoRooms();
+    const svg = screen.getByTestId("plan-svg");
+
+    const edgeOf = (label: string, pick: (xs: number[]) => number) => pick(loopXs(label));
+    const targetX = edgeOf("A", (xs) => Math.max(...xs));
+
+    // Park the room a few centimetres short of touching, then nudge it. Only snapping
+    // can close a gap that small, so an exact landing proves it happened.
+    const gap = 40;
+    act(() =>
+      useStore
+        .getState()
+        .apply((p) =>
+          moveLoop(
+            p,
+            p.walls.find((w) => w.label === "E")!.id,
+            targetX + gap - edgeOf("E", (xs) => Math.min(...xs)),
+            0,
+          ),
+        ),
+    );
+    expect(edgeOf("E", (xs) => Math.min(...xs))).toBe(targetX + gap);
+
+    fireEvent.pointerDown(wallEl("E"), { clientX: 500, clientY: 200, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 499, clientY: 200 });
+    const guides = screen.getAllByTestId("align-guide");
+    fireEvent.pointerUp(svg, { clientX: 499, clientY: 200 });
+
+    // Left edge of the moved room now sits exactly on the right edge of the other.
+    expect(edgeOf("E", (xs) => Math.min(...xs))).toBe(targetX);
+    expect(guides.some((g) => g.getAttribute("data-axis") === "x")).toBe(true);
+  });
+
+  it("drops the guides once the drag ends", async () => {
+    await twoRooms();
+    const svg = screen.getByTestId("plan-svg");
+    fireEvent.pointerDown(wallEl("E"), { clientX: 500, clientY: 200, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 499, clientY: 200 });
+    fireEvent.pointerUp(svg, { clientX: 499, clientY: 200 });
+    expect(screen.queryAllByTestId("align-guide")).toHaveLength(0);
+  });
+
+  it("is a single undo step", async () => {
+    await twoRooms();
+    const svg = screen.getByTestId("plan-svg");
+    const before = loopXs("E");
+
+    fireEvent.pointerDown(wallEl("E"), { clientX: 400, clientY: 200, button: 0 });
+    for (let x = 395; x >= 350; x -= 5) {
+      fireEvent.pointerMove(svg, { clientX: x, clientY: 200 });
+    }
+    fireEvent.pointerUp(svg, { clientX: 350, clientY: 200 });
+    expect(loopXs("E")).not.toEqual(before);
+
+    act(() => useStore.getState().undo());
+    expect(loopXs("E")).toEqual(before);
+  });
+
+  it("does not move a room while the wall tool is active", async () => {
+    await twoRooms();
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    const svg = screen.getByTestId("plan-svg");
+    const before = loopXs("E");
+
+    fireEvent.pointerDown(wallEl("E"), { clientX: 400, clientY: 200, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 340, clientY: 240 });
+    fireEvent.pointerUp(svg, { clientX: 340, clientY: 240 });
+
+    expect(loopXs("E")).toEqual(before);
+  });
+});
+
+describe("dragging a room in many small steps", () => {
+  it("lands where a single big step would, not short of it", async () => {
+    render(<App />);
+    for (const sizes of ["400,90,300,90,400,90,300,90", "250,90,200,90,250,90,200,90"]) {
+      await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+      await userEvent.type(screen.getByTestId("measurements-input"), sizes);
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    }
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+
+    const svg = screen.getByTestId("plan-svg");
+    const wallE = screen
+      .getAllByTestId("wall")
+      .find((w) => w.getAttribute("data-wall-label") === "E")!;
+    const xs = (label: string) => {
+      const p = useStore.getState().project;
+      const id = p.walls.find((w) => w.label === label)!.id;
+      const ids = new Set(loopNodeIds(p, id));
+      return p.nodes.filter((n) => ids.has(n.id)).map((n) => n.x);
+    };
+
+    const before = Math.min(...xs("E"));
+
+    // Nudging across in many small moves must accumulate exactly like one big move.
+    fireEvent.pointerDown(wallE, { clientX: 500, clientY: 200, button: 0 });
+    for (let x = 495; x >= 460; x -= 5) {
+      fireEvent.pointerMove(svg, { clientX: x, clientY: 200 });
+    }
+    fireEvent.pointerUp(svg, { clientX: 460, clientY: 200 });
+    const stepwise = before - Math.min(...xs("E"));
+
+    act(() => useStore.getState().undo());
+
+    fireEvent.pointerDown(wallE, { clientX: 500, clientY: 200, button: 0 });
+    fireEvent.pointerMove(svg, { clientX: 460, clientY: 200 });
+    fireEvent.pointerUp(svg, { clientX: 460, clientY: 200 });
+    const oneGo = before - Math.min(...xs("E"));
+
+    expect(stepwise).toBe(oneGo);
   });
 });

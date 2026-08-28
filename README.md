@@ -99,6 +99,12 @@ neighbour's thickness and the angle between them — half a thickness at a squar
 at a sharp one. A wall that is not part of a closed run has no inside, so it falls back to
 its centreline rather than inventing a side.
 
+With the **Select** tool, dragging a wall or a room's fill moves that whole room — its walls,
+its tint and its name together. As it comes near another room it snaps, corner onto corner,
+with a guide showing what it caught. Each axis settles separately, so a room already flush
+against a wall slides along it instead of being yanked onto a corner. Snapping puts the wall
+centrelines together, which leaves exactly one wall of that thickness between the two rooms.
+
 Zoom and fit buttons sit at the bottom right of the canvas. The **Pan** tool drags the view,
 and shift-drag or middle-drag pans with any tool selected.
 

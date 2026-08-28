@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { addOpening, addRoom, commitWallChain, moveNode } from "../model/ops";
+import { moveLoop, roomsInLoop } from "../model/loops";
+import { snapLoopDelta } from "./loopSnap";
 import { projectUnit } from "../model/factory";
 import type { Point } from "../model/types";
 import { PlanSvg } from "../render/PlanSvg";
@@ -27,6 +29,10 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [freeAngle, setFreeAngle] = useState(false);
   const dragging = useRef<{ nodeId: string } | null>(null);
+  // Dragging a whole run of walls: where the pointer started, and how far the run has
+  // been shifted so far, so each move applies only the difference.
+  const loopDrag = useRef<{ wallId: string; from: Point; applied: Point } | null>(null);
+  const [loopGuides, setLoopGuides] = useState<Guide[]>([]);
   const panning = useRef<{ x: number; y: number } | null>(null);
 
   const { viewport, viewBox, svgRef, fit, toPlan, zoomAt, zoomBy, panBy } = useViewport(width, height);
@@ -132,6 +138,35 @@ export function Canvas({ width, height }: { width: number; height: number }) {
       applyTransient((p) => moveNode(p, id, raw));
       return;
     }
+
+    if (loopDrag.current) {
+      const drag = loopDrag.current;
+      const raw = toPlan(e.clientX, e.clientY);
+      // How far the run still has to move from where it already is. Snapping is judged
+      // against the run's present position, so the step has to be relative to it too —
+      // measuring from the start of the drag would count the movement already applied
+      // twice over, and the snap would land short by exactly that much.
+      const wanted = { x: raw.x - drag.from.x, y: raw.y - drag.from.y };
+      const pending = {
+        x: wanted.x - drag.applied.x,
+        y: wanted.y - drag.applied.y,
+      };
+      const snapped = snapLoopDelta({
+        project,
+        wallId: drag.wallId,
+        rawDelta: pending,
+        mmPerPx: viewport.mmPerPx,
+      });
+      drag.applied = {
+        x: drag.applied.x + snapped.delta.x,
+        y: drag.applied.y + snapped.delta.y,
+      };
+      setLoopGuides(snapped.guides);
+      if (snapped.delta.x !== 0 || snapped.delta.y !== 0) {
+        applyTransient((p) => moveLoop(p, drag.wallId, snapped.delta.x, snapped.delta.y));
+      }
+      return;
+    }
     if (draft.points.length) {
       const raw = toPlan(e.clientX, e.clientY);
       setDraft((d) => {
@@ -151,6 +186,21 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   function onPointerUp() {
     panning.current = null;
     dragging.current = null;
+    loopDrag.current = null;
+    setLoopGuides([]);
+  }
+
+  /** Begin dragging the whole run of walls that `wallId` belongs to. */
+  function beginLoopDrag(wallId: string, e: React.PointerEvent) {
+    if (tool !== "select" || e.button !== 0 || e.shiftKey) return;
+    e.stopPropagation();
+    beginHistoryStep();
+    loopDrag.current = {
+      wallId,
+      from: toPlan(e.clientX, e.clientY),
+      applied: { x: 0, y: 0 },
+    };
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   }
 
   function onWheel(e: React.WheelEvent) {
@@ -161,6 +211,20 @@ export function Canvas({ width, height }: { width: number; height: number }) {
 
   const overlay = (
     <g data-testid="draft">
+      {loopGuides.map((g) => (
+        <line
+          key={`loop-${g.axis}-${g.from.x}-${g.from.y}`}
+          data-testid="align-guide"
+          data-axis={g.axis}
+          x1={g.axis === "x" ? g.from.x : g.from.x - 40_000}
+          y1={g.axis === "x" ? g.from.y - 40_000 : g.from.y}
+          x2={g.axis === "x" ? g.from.x : g.from.x + 40_000}
+          y2={g.axis === "x" ? g.from.y + 40_000 : g.from.y}
+          stroke={GUIDE}
+          strokeWidth={viewport.mmPerPx}
+          strokeDasharray={`${5 * viewport.mmPerPx} ${5 * viewport.mmPerPx}`}
+        />
+      ))}
       {draft.cursor &&
         draft.guides.map((g) => (
           <g key={`${g.axis}-${g.from.x}-${g.from.y}`} data-testid="align-guide" data-axis={g.axis}>
@@ -252,6 +316,15 @@ export function Canvas({ width, height }: { width: number; height: number }) {
             return;
           }
           if (tool === "select") select({ kind: "wall", id });
+        }}
+        onWallPointerDown={beginLoopDrag}
+        onRoomPointerDown={(roomId, e) => {
+          // Grab the run of walls this room sits in, so its tint and its walls move
+          // together rather than the fill sliding off the walls.
+          const wall = project.walls.find((w) =>
+            roomsInLoop(project, w.id).includes(roomId),
+          );
+          if (wall) beginLoopDrag(wall.id, e);
         }}
         onPickOpening={(id) => tool === "select" && select({ kind: "opening", id })}
         onPickRoom={(id) => tool === "select" && select({ kind: "room", id })}

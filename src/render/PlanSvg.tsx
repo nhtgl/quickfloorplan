@@ -41,6 +41,8 @@ export type PlanSvgProps = {
   onPickOpening?: (id: string) => void;
   onPickNode?: (id: string) => void;
   onNodePointerDown?: (id: string, e: React.PointerEvent) => void;
+  onWallPointerDown?: (id: string, e: React.PointerEvent) => void;
+  onRoomPointerDown?: (id: string, e: React.PointerEvent) => void;
   svgRef?: (el: SVGSVGElement | null) => void;
   onPointerDown?: (e: React.PointerEvent<SVGSVGElement>) => void;
   onPointerMove?: (e: React.PointerEvent<SVGSVGElement>) => void;
@@ -102,8 +104,9 @@ export function PlanSvg(props: PlanSvgProps) {
                 fill={room.tint}
                 stroke={selected ? ACCENT : "none"}
                 strokeWidth={selected ? hairline * 2 : 0}
+                onPointerDown={(e) => props.onRoomPointerDown?.(room.id, e)}
                 onClick={() => props.onPickRoom?.(room.id)}
-                style={{ cursor: props.onPickRoom ? "pointer" : undefined }}
+                style={{ cursor: props.onPickRoom ? "move" : undefined }}
               />
               {room.polygon.map((a, i) => {
                 const b = room.polygon[(i + 1) % room.polygon.length];
@@ -166,8 +169,9 @@ export function PlanSvg(props: PlanSvgProps) {
             stroke={selected ? ACCENT : WALL}
             strokeWidth={w.thickness}
             strokeLinecap="butt"
+            onPointerDown={(e) => props.onWallPointerDown?.(w.id, e)}
             onClick={() => props.onPickWall?.(w.id)}
-            style={{ cursor: props.onPickWall ? "pointer" : undefined }}
+            style={{ cursor: props.onPickWall ? "move" : undefined }}
           />
         );
       })}
