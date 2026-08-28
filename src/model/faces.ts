@@ -1,6 +1,8 @@
 import { loopSignedArea, pointAlongWall, wallById, wallEnds } from "./geometry";
+import { coincidentWalls } from "./sharedOpenings";
+import { roomsInLoop } from "./loops";
 import { wallSpanForSide } from "./measure";
-import type { Point, Project, WallId } from "./types";
+import type { Point, Project, Room, WallId } from "./types";
 import { offsetForSide } from "./walls";
 
 /** Which of a wall's three lines a point sits on. */
@@ -60,25 +62,55 @@ export function allFaceCorners(p: Project): FaceCorner[] {
  * "Left" and "right" mean nothing to someone holding a tape, but "the kitchen side" does.
  * A side with no room against it is outside the plan as drawn.
  */
-export function wallSideNames(p: Project, id: WallId): { left: string; right: string } {
+export function roomsOnSide(p: Project, id: WallId, side: number): Room[] {
   const { a, b } = wallEnds(p, id);
   const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
   const nx = -(b.y - a.y) / len;
   const ny = (b.x - a.x) / len;
   const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 
-  const names: { left: string[]; right: string[] } = { left: [], right: [] };
-  for (const room of p.rooms) {
-    if (room.polygon.length < 3) continue;
-    const c = room.polygon.reduce(
-      (acc, pt) => ({ x: acc.x + pt.x / room.polygon.length, y: acc.y + pt.y / room.polygon.length }),
-      { x: 0, y: 0 },
-    );
-    const side = (c.x - mid.x) * nx + (c.y - mid.y) * ny;
-    // Only rooms actually against this wall, not every room in the plan.
-    if (Math.hypot(c.x - mid.x, c.y - mid.y) > 20_000) continue;
-    (side >= 0 ? names.left : names.right).push(room.name);
+  return p.rooms
+    .filter((room) => {
+      if (room.polygon.length < 3) return false;
+      const c = room.polygon.reduce(
+        (acc, pt) => ({
+          x: acc.x + pt.x / room.polygon.length,
+          y: acc.y + pt.y / room.polygon.length,
+        }),
+        { x: 0, y: 0 },
+      );
+      // Only rooms actually against this wall, not every room in the plan.
+      if (Math.hypot(c.x - mid.x, c.y - mid.y) > 20_000) return false;
+      const which = (c.x - mid.x) * nx + (c.y - mid.y) * ny;
+      return side >= 0 ? which >= 0 : which < 0;
+    });
+}
+
+/**
+ * Whether a face is worth dimensioning.
+ *
+ * A wall dimensions the rooms of its own run, and nobody else's. Two rooms pushed
+ * together have a wall each on the same line, and both can see a room on either side of
+ * them; without this each face would be dimensioned twice over, stacking four strings
+ * into the gap between the rooms where two of them repeat the other two.
+ *
+ * A face with no room against it is dimensioned only when it is the outside of the
+ * building, which is worth stating once.
+ */
+export function faceIsWorthDimensioning(p: Project, id: WallId, side: number): boolean {
+  const rooms = roomsOnSide(p, id, side);
+  if (rooms.length > 0) {
+    const mine = new Set(roomsInLoop(p, id));
+    return rooms.some((r) => mine.has(r.id));
   }
+  return coincidentWalls(p, id).length === 0;
+}
+
+export function wallSideNames(p: Project, id: WallId): { left: string; right: string } {
+  const names = {
+    left: roomsOnSide(p, id, 1).map((r) => r.name),
+    right: roomsOnSide(p, id, -1).map((r) => r.name),
+  };
 
   // With no room against a side, say which way it faces. A wall in a closed run has an
   // inside and an outside; a loose one only has a left and a right. The two must differ,
@@ -125,4 +157,21 @@ export function wallCrossSection(
     left: { x: on.x + nx * wall.offsets.left, y: on.y + ny * wall.offsets.left },
     right: { x: on.x - nx * wall.offsets.right, y: on.y - ny * wall.offsets.right },
   };
+}
+
+/** A point on one face of a wall, a measured distance along the wall's own axis. */
+export function facePointAt(
+  p: Project,
+  id: WallId,
+  side: number,
+  distance: number,
+): Point {
+  const wall = wallById(p, id);
+  const { a, b } = wallEnds(p, id);
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = -(b.y - a.y) / len;
+  const ny = (b.x - a.x) / len;
+  const off = side * offsetForSide(wall, side);
+  const on = pointAlongWall(p, id, distance);
+  return { x: on.x + nx * off, y: on.y + ny * off };
 }

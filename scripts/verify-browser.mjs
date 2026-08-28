@@ -383,7 +383,9 @@ const checks = [
   ["wall lengths read from inside faces", dimLabels.includes("508 cm") && dimLabels.includes("328 cm")],
   ["dimensions read in centimetres", !dimLabels.some((t) => t.includes(" m"))],
   ["chain sums to the inside length", chainSum === 508],
-  ["setting-out chain marks each opening", chainSegs === 4],
+  // Each opening now appears in two chains, one per face of its wall.
+  // Openings appear on each face worth dimensioning; the back-to-back one is skipped.
+  ["setting-out chain marks each opening on the faces that bound a room", chainSegs >= 4],
   ["backspace takes back the last corner", beforeBackspace === 3 && afterBackspace === 2],
   ["an alignment guide appears when lining up with a corner", guideCount > 0],
   ["typed measurements close exactly", (readout ?? "").includes("Closes exactly")],

@@ -7,6 +7,7 @@ import {
   wallLinePoints,
   wallPolygon,
   wallSideNames,
+  faceIsWorthDimensioning,
 } from "./faces";
 import {
   centrelineForSideLength,
@@ -326,5 +327,55 @@ describe("faces of different lengths", () => {
     if (result.ok) {
       expect(wallLengthForSide(result.project, wall(result.project, "A"), -1)).toBe(4600);
     }
+  });
+});
+
+describe("which faces are worth dimensioning", () => {
+  it("dimensions a face with a room against it", () => {
+    const p: Project = {
+      ...rect(),
+      rooms: [
+        {
+          id: "r1",
+          name: "Kitchen",
+          tint: "#eee",
+          polygon: [
+            { x: 50, y: 50 },
+            { x: 4150, y: 50 },
+            { x: 4150, y: 3050 },
+            { x: 50, y: 3050 },
+          ],
+        },
+      ],
+    };
+    expect(faceIsWorthDimensioning(p, wall(p, "A"), 1)).toBe(true);
+  });
+
+  it("dimensions a bare face when it is the outside of the building", () => {
+    const p = rect();
+    expect(faceIsWorthDimensioning(p, wall(p, "A"), -1)).toBe(true);
+  });
+
+  it("skips a bare face pressed against another wall", () => {
+    // A second room sharing the first's right-hand wall line.
+    let p = rect();
+    p = chainOfWalls(
+      p,
+      [
+        { x: 4200, y: 0 },
+        { x: 6200, y: 0 },
+        { x: 6200, y: 3100 },
+        { x: 4200, y: 3100 },
+      ],
+      true,
+      100,
+    );
+    const shared = p.walls.find(
+      (w) => w.label === "E" || w.label === "H",
+    );
+    expect(shared).toBeDefined();
+    // Whichever of the two back-to-back faces has no room is not worth a second string.
+    const sides = [1, -1].map((side) => faceIsWorthDimensioning(p, wall(p, "B"), side));
+    expect(sides).toContain(false);
   });
 });

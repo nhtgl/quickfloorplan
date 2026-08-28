@@ -1,5 +1,5 @@
 import { wallById, wallEnds, wallLength } from "./geometry";
-import { wallMeasuredSpan } from "./measure";
+import { wallSpanForSide } from "./measure";
 import { viewSpan, wallOpeningViews } from "./sharedOpenings";
 import type { OpeningId, Point, Project } from "./types";
 
@@ -120,8 +120,12 @@ export type ChainSegment = {
  * chain sum to more than the wall, and a dimension chain that does not add up is worse
  * than none. The overlap itself is already reported as a warning.
  */
-export function wallDimensionChain(p: Project, wallId: string): ChainSegment[] {
-  const span = wallMeasuredSpan(p, wallId);
+export function wallDimensionChain(
+  p: Project,
+  wallId: string,
+  side: number = 0,
+): ChainSegment[] {
+  const span = wallSpanForSide(p, wallId, side);
   const clamp = (v: number) => Math.max(span.start, Math.min(span.end, v));
 
   const spans = wallOpeningViews(p, wallId)

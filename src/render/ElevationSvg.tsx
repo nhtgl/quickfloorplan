@@ -1,6 +1,6 @@
 import { wallById, wallHeight } from "../model/geometry";
 import { projectUnit } from "../model/factory";
-import { wallMeasuredLength, wallMeasuredSpan } from "../model/measure";
+import { wallFaceSign, wallMeasuredLength, wallSpanForSide } from "../model/measure";
 import { wallDimensionChain } from "../model/openings";
 import { wallOpeningViews } from "../model/sharedOpenings";
 import type { Project, WallId } from "../model/types";
@@ -35,7 +35,8 @@ export function ElevationSvg(props: ElevationSvgProps) {
   const { project: p, wallId, width, height, highlightIds = [], alertIds = [] } = props;
   const wall = wallById(p, wallId);
   // The drawing shows the measured face, so x runs from that face's start, not the node.
-  const span = wallMeasuredSpan(p, wallId);
+  const side = wallFaceSign(p, wallId);
+  const span = wallSpanForSide(p, wallId, side);
   const len = wallMeasuredLength(p, wallId);
   const along = (centrelineDistance: number) => centrelineDistance - span.start;
   const h = wallHeight(p, wallId);
@@ -43,7 +44,7 @@ export function ElevationSvg(props: ElevationSvgProps) {
   // shows on both rooms' elevations without being stored twice.
   const openings = wallOpeningViews(p, wallId);
   const unit = projectUnit(p);
-  const chain = wallDimensionChain(p, wallId);
+  const chain = wallDimensionChain(p, wallId, side);
 
   const { viewBox, mmPerPx } = fitViewBox(
     { minX: 0, minY: -h, maxX: len, maxY: 0 },

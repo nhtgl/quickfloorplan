@@ -180,7 +180,7 @@ describe("wallDimensionChain", () => {
     const { wallMeasuredLength } = await import("./measure");
     const inside: Project = { ...withOpening(wallProject(), { offset: 1500, width: 1200 }).project, measureFrom: "inside" };
     const wallId = inside.walls[0].id;
-    const chain = wallDimensionChain(inside, wallId);
+    const chain = wallDimensionChain(inside, wallId, 1);
     // Each end loses half the neighbouring wall's thickness.
     expect(chain.map((c) => [c.kind, c.end - c.start])).toEqual([
       ["solid", 850],

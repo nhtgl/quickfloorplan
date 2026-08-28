@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import { chainOfWalls, emptyProject } from "../model/factory";
-import { loopCentroid, wallEnds } from "../model/geometry";
+import { loopCentroid } from "../model/geometry";
+import { facePointAt } from "../model/faces";
 import { newId } from "../model/ids";
 import { ElevationSvg } from "./ElevationSvg";
 import { PlanSvg } from "./PlanSvg";
@@ -33,43 +34,40 @@ describe("PlanSvg", () => {
     ]);
   });
 
-  it("dimensions every wall in the project's unit", () => {
-    const { container } = render(<PlanSvg project={base()} width={800} height={600} />);
-    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
+  const dimLabels = (p: Project) => {
+    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
+    return [...container.querySelectorAll('[data-testid="dim-label"]')].map(
       (n) => n.textContent,
     );
-    expect(labels).toContain("420 cm");
-    expect(labels).toContain("310 cm");
+  };
+
+  it("dimensions both faces of every wall, each along itself", () => {
+    const labels = dimLabels(base());
+    // 100 thick walls take 50 off each end of the inner faces and add 50 to the outer.
+    expect(labels).toContain("410 cm");
+    expect(labels).toContain("430 cm");
+    expect(labels).toContain("300 cm");
+    expect(labels).toContain("320 cm");
+  });
+
+  it("never puts the centreline on the drawing, since nobody can measure it", () => {
+    const labels = dimLabels(base());
+    expect(labels).not.toContain("420 cm");
+    expect(labels).not.toContain("310 cm");
+  });
+
+  it("draws a dimension per face whatever the project measures from", () => {
+    for (const measureFrom of ["inside", "centre", "outside"] as const) {
+      const labels = dimLabels({ ...base(), measureFrom });
+      expect(labels).toContain("410 cm");
+      expect(labels).toContain("430 cm");
+    }
   });
 
   it("switches to metres when the project says so", () => {
-    const p = { ...base(), units: "m" as const };
-    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
-    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
-      (n) => n.textContent,
-    );
-    expect(labels).toContain("4.20 m");
-  });
-
-  it("states inside-face lengths when the project measures from inside", () => {
-    const p: Project = { ...base(), measureFrom: "inside" };
-    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
-    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
-      (n) => n.textContent,
-    );
-    // 100 thick walls take 50 off each end of the 4200 and 3100 centrelines.
-    expect(labels).toContain("410 cm");
-    expect(labels).toContain("300 cm");
-  });
-
-  it("states outside-face lengths when the project measures from outside", () => {
-    const p: Project = { ...base(), measureFrom: "outside" };
-    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
-    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
-      (n) => n.textContent,
-    );
-    expect(labels).toContain("430 cm");
-    expect(labels).toContain("320 cm");
+    const labels = dimLabels({ ...base(), units: "m" });
+    expect(labels).toContain("4.10 m");
+    expect(labels).toContain("4.30 m");
   });
 
   it("draws a setting-out chain beside the overall length once a wall has an opening", () => {
@@ -89,11 +87,15 @@ describe("PlanSvg", () => {
     const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
       (n) => n.textContent,
     );
-    // Corner to opening, the opening, opening to far corner, and the overall.
-    expect(labels).toContain("90 cm");
+    // Corner to opening, the opening, opening to far corner, and the overall — for the
+    // inner face, and again for the outer.
+    expect(labels).toContain("85 cm");
     expect(labels).toContain("120 cm");
-    expect(labels).toContain("210 cm");
-    expect(labels).toContain("420 cm");
+    expect(labels).toContain("205 cm");
+    expect(labels).toContain("410 cm");
+    expect(labels).toContain("95 cm");
+    expect(labels).toContain("215 cm");
+    expect(labels).toContain("430 cm");
   });
 
   it("leaves a wall with no openings a single overall dimension", () => {
@@ -248,9 +250,7 @@ describe("ElevationSvg", () => {
 });
 
 describe("dimension placement with more than one room", () => {
-  it("pushes each wall's dimension away from its own loop, not the whole plan", () => {
-    // Two separate rectangles side by side. The point between them is on the wrong side
-    // of half the walls, so a whole-plan centroid would draw dimensions inside a room.
+  it("draws each face's dimension outside that face, in either room", () => {
     let p = chainOfWalls(emptyProject("Two"), RECT, true);
     p = chainOfWalls(
       p,
@@ -262,27 +262,20 @@ describe("dimension placement with more than one room", () => {
       ],
       true,
     );
-    p = { ...p, measureFrom: "centre" };
 
     const { container } = render(<PlanSvg project={p} width={900} height={600} />);
-    const labels = [...container.querySelectorAll('[data-testid="dim"]')];
 
-    // For every wall, the dimension line must sit outside the loop it belongs to.
     for (const wall of p.walls) {
       const centre = loopCentroid(p, wall.id)!;
-      const { a, b } = wallEnds(p, wall.id);
-      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      // Distance from the loop centre to the wall, versus to its dimension line.
-      const toWall = Math.hypot(mid.x - centre.x, mid.y - centre.y);
-      // The label nearest this wall's midpoint is its own.
-      const line = labels
-        .map((g) => g.querySelector("text")!)
-        .map((t) => ({ x: Number(t.getAttribute("x")), y: Number(t.getAttribute("y")) }))
-        .sort(
-          (u, v) =>
-            Math.hypot(u.x - mid.x, u.y - mid.y) - Math.hypot(v.x - mid.x, v.y - mid.y),
-        )[0];
-      expect(Math.hypot(line.x - centre.x, line.y - centre.y)).toBeGreaterThan(toWall);
+      const inner = facePointAt(p, wall.id, 1, 100);
+      const outer = facePointAt(p, wall.id, -1, 100);
+      // The inner face is the one nearer the middle of its own room, in both rooms.
+      expect(Math.hypot(inner.x - centre.x, inner.y - centre.y)).toBeLessThan(
+        Math.hypot(outer.x - centre.x, outer.y - centre.y),
+      );
     }
+
+    // Both faces of every wall: neither room here has anything back to back with it.
+    expect(container.querySelectorAll('[data-testid="face-dimensions"]')).toHaveLength(16);
   });
 });

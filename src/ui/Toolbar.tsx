@@ -111,7 +111,7 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
           onChange={(e) =>
             apply((p) => ({ ...p, measureFrom: e.currentTarget.value as MeasureFrom }))
           }
-          title="Which faces a wall's stated length runs between"
+          title="Which face the elevation pages draw, and which face a typed room size means. The plan dimensions every face on its own."
         >
           <option value="inside">Inside faces</option>
           <option value="centre">Centrelines</option>

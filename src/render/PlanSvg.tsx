@@ -1,15 +1,13 @@
 import type { ReactNode } from "react";
 import {
-  loopCentroid,
   loopGap,
   nodeById,
-  pointAlongWall,
   wallAngleDeg,
   wallEnds,
   wallLength,
 } from "../model/geometry";
 import { projectUnit } from "../model/factory";
-import { wallMeasuredLength, wallMeasuredSpan } from "../model/measure";
+import { wallLengthForSide, wallSpanForSide } from "../model/measure";
 import {
   doorSwingArc,
   labelOffsetAlongWall,
@@ -17,7 +15,12 @@ import {
   wallDimensionChain,
 } from "../model/openings";
 import { viewSpan, wallOpeningViews } from "../model/sharedOpenings";
-import { wallCrossSection, wallPolygon } from "../model/faces";
+import {
+  facePointAt,
+  faceIsWorthDimensioning,
+  wallCrossSection,
+  wallPolygon,
+} from "../model/faces";
 import { edgeHasWallBehind, roomArea } from "../model/rooms";
 import type { Point, Project } from "../model/types";
 import { formatArea, formatDeg, formatLengthWithUnit } from "../model/units";
@@ -274,47 +277,45 @@ export function PlanSvg(props: PlanSvgProps) {
         );
       })}
 
+      {/* Every face carries its own dimensions, drawn along that face and running to the
+          corners of that face. Nothing is measured from the centreline, because nobody
+          can put a tape on a line buried inside a wall: each room is dimensioned by the
+          face it can actually see. */}
       {showDims &&
-        p.walls.map((w) => {
-          const { a, b } = wallEnds(p, w.id);
-          const span = wallMeasuredSpan(p, w.id);
-          const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-          // Push the dimensions to the side facing away from the room this wall encloses,
-          // falling back to the whole plan for a wall that encloses nothing.
-          const away = loopCentroid(p, w.id) ?? planCentre;
-          const nx = -(b.y - a.y);
-          const ny = b.x - a.x;
-          const outward = (mid.x - away.x) * nx + (mid.y - away.y) * ny >= 0 ? 1 : -1;
-          const chain = wallDimensionChain(p, w.id);
-          const hasOpenings = chain.some((c) => c.kind === "opening");
+        p.walls.flatMap((w) =>
+          [1, -1].map((side) => {
+            if (!faceIsWorthDimensioning(p, w.id, side)) return null;
+            const chain = wallDimensionChain(p, w.id, side);
+            const hasOpenings = chain.some((c) => c.kind === "opening");
+            const span = wallSpanForSide(p, w.id, side);
+            const at = (d: number) => facePointAt(p, w.id, side, d);
 
-          return (
-            <g key={`${w.id}-dims`}>
-              {/* Setting-out chain nearest the wall; it tiles the wall end to end. */}
-              {hasOpenings &&
-                chain.map((seg) => (
-                  <DimLine
-                    key={`${w.id}-${seg.start}`}
-                    data-kind={seg.kind}
-                    from={pointAlongWall(p, w.id, seg.start)}
-                    to={pointAlongWall(p, w.id, seg.end)}
-                    label={formatLengthWithUnit(Math.round(seg.end - seg.start), unit)}
-                    offset={outward * 22 * mmPerPx}
-                    mmPerPx={mmPerPx}
-                    color={seg.kind === "opening" ? ACCENT : undefined}
-                  />
-                ))}
-              {/* Overall length sits outside the chain, the way a builder reads it. */}
-              <DimLine
-                from={pointAlongWall(p, w.id, span.start)}
-                to={pointAlongWall(p, w.id, span.end)}
-                label={formatLengthWithUnit(wallMeasuredLength(p, w.id), unit)}
-                offset={outward * (hasOpenings ? 52 : 22) * mmPerPx}
-                mmPerPx={mmPerPx}
-              />
-            </g>
-          );
-        })}
+            return (
+              <g key={`${w.id}-dims-${side}`} data-testid="face-dimensions" data-side={side}>
+                {hasOpenings &&
+                  chain.map((seg) => (
+                    <DimLine
+                      key={`${w.id}-${side}-${seg.start}`}
+                      data-kind={seg.kind}
+                      from={at(seg.start)}
+                      to={at(seg.end)}
+                      label={formatLengthWithUnit(Math.round(seg.end - seg.start), unit)}
+                      offset={side * 20 * mmPerPx}
+                      mmPerPx={mmPerPx}
+                      color={seg.kind === "opening" ? ACCENT : undefined}
+                    />
+                  ))}
+                <DimLine
+                  from={at(span.start)}
+                  to={at(span.end)}
+                  label={formatLengthWithUnit(wallLengthForSide(p, w.id, side), unit)}
+                  offset={side * (hasOpenings ? 50 : 20) * mmPerPx}
+                  mmPerPx={mmPerPx}
+                />
+              </g>
+            );
+          }),
+        )}
 
       {showDims &&
         p.walls.map((w) => {

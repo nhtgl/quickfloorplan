@@ -107,10 +107,14 @@ Measurements are in **centimetres** by default, which is how a tape gets read an
 down. The Units control in the toolbar switches the whole project to metres. Room areas stay
 in m² either way, because a room in square centimetres is a six-digit number nobody can read.
 
-Walls are drawn on their centrelines, but a stated length can run between whichever faces
-you actually measured. The **Measure** control offers **inside faces** (the default, since a
-tape held across a room gives the clear internal distance), **centrelines**, or **outside
-faces**. Type the number you measured and the tool works out where the centreline has to go.
+**Every dimension on the plan is a measurement of a face**, drawn along that face and running
+between that face's own corners. Nothing is dimensioned from the centreline, because nobody
+can put a tape on a line buried inside a wall. Each room is measured by the face it can
+actually see, so two rooms sharing a wall each get their own internal dimensions, and the
+outside of the building is stated once.
+
+Walls are stored on their centrelines all the same. The **Measure** control decides which face
+the elevation pages draw and which face a typed room size means.
 
 At a corner a wall's face stops where it meets its neighbour's, so the correction uses the
 neighbour's thickness and the angle between them — half a thickness at a square corner, more
