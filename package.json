@@ -1,7 +1,25 @@
 {
   "name": "quickfloorplan",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
+  "description": "Sketch a flat's walls, openings and rooms and export a measured PDF. A measurement document, not a visualisation.",
+  "license": "MIT",
+  "author": "Maciej Nachtygal",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nhtgl/quickfloorplan.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nhtgl/quickfloorplan/issues"
+  },
+  "homepage": "https://github.com/nhtgl/quickfloorplan#readme",
+  "keywords": [
+    "floor-plan",
+    "measurements",
+    "pdf",
+    "survey",
+    "renovation"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
