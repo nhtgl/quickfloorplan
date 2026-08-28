@@ -60,6 +60,18 @@ export type Room = {
   tint: string;
 };
 
+export type Photo = {
+  id: string;
+  /** Original file name, kept so the user can tell one photo from another. */
+  name: string;
+  caption: string;
+  /** Downscaled image as a data URI, so a project stays a single portable file. */
+  dataUrl: string;
+  /** Pixel size of the stored image, for laying it out on a page. */
+  width: number;
+  height: number;
+};
+
 export type Project = {
   schema: "quickfloorplan/1";
   name: string;
@@ -73,6 +85,8 @@ export type Project = {
   walls: Wall[];
   openings: Opening[];
   rooms: Room[];
+  /** Reference photos. Absent in files written before photos existed. */
+  photos?: Photo[];
   createdAt: string;
   updatedAt: string;
 };

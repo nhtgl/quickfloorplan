@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MeasurementsDialog } from "./MeasurementsDialog";
+import { PhotosDialog } from "./PhotosDialog";
 import { emptyProject } from "../model/factory";
 import { formatLength, parseLength, stepFor, type Unit } from "../model/units";
 import { projectUnit } from "../model/factory";
@@ -28,6 +29,7 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
   const redo = useStore((s) => s.redo);
   const [busy, setBusy] = useState(false);
   const [typing, setTyping] = useState(false);
+  const [photos, setPhotos] = useState(false);
   const unit = projectUnit(project);
   const measureFrom = projectMeasureFrom(project);
 
@@ -139,6 +141,7 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
         <button onClick={undo} title="Undo (Cmd/Ctrl+Z)">Undo</button>
         <button onClick={redo} title="Redo (Shift+Cmd/Ctrl+Z)">Redo</button>
         <button onClick={() => setTyping(true)}>Room from sizes…</button>
+        <button onClick={() => setPhotos(true)}>Photos…</button>
         <button onClick={() => reset(emptyProject("Untitled"))}>New</button>
         <button onClick={doOpen}>Open</button>
         <button onClick={() => saveProject(project).catch(() => undefined)}>Save</button>
@@ -147,6 +150,7 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
         </button>
       </div>
       {typing && <MeasurementsDialog onClose={() => setTyping(false)} />}
+      {photos && <PhotosDialog onClose={() => setPhotos(false)} />}
     </header>
   );
 }

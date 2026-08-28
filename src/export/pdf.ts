@@ -9,7 +9,8 @@ import { DIM, INK } from "../render/theme";
 import { projectUnit } from "../model/factory";
 import type { Project } from "../model/types";
 import { unitName } from "../model/units";
-import { elevationTitle } from "./pageTitles";
+import { fitDimensions, photoTitle, projectPhotos } from "../model/photos";
+import { elevationTitle, SKETCH_TITLE } from "./pageTitles";
 
 // A4 landscape in points.
 const PAGE_W = 841.89;
@@ -51,7 +52,14 @@ function renderToSvg(element: React.ReactElement): { svg: SVGSVGElement; dispose
   };
 }
 
-function chrome(doc: jsPDF, project: Project, title: string, page: number, total: number) {
+function chrome(
+  doc: jsPDF,
+  project: Project,
+  title: string,
+  page: number,
+  total: number,
+  note = `Not to scale — all dimensions in ${unitName(projectUnit(project))}`,
+) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(INK);
@@ -62,12 +70,7 @@ function chrome(doc: jsPDF, project: Project, title: string, page: number, total
   doc.setTextColor(DIM);
   const date = new Date().toISOString().slice(0, 10);
   doc.text(`${project.name} · ${date}`, MARGIN, PAGE_H - MARGIN + 4);
-  doc.text(
-    `Not to scale — all dimensions in ${unitName(projectUnit(project))}`,
-    PAGE_W / 2,
-    PAGE_H - MARGIN + 4,
-    { align: "center" },
-  );
+  doc.text(note, PAGE_W / 2, PAGE_H - MARGIN + 4, { align: "center" });
   doc.text(`Page ${page} of ${total}`, PAGE_W - MARGIN, PAGE_H - MARGIN + 4, {
     align: "right",
   });
@@ -75,7 +78,8 @@ function chrome(doc: jsPDF, project: Project, title: string, page: number, total
 
 export async function exportPdf(project: Project): Promise<Blob> {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-  const total = 1 + project.walls.length;
+  const photos = projectPhotos(project);
+  const total = 2 + project.walls.length + photos.length;
   const top = MARGIN + TITLE_H;
 
   const plan = renderToSvg(
@@ -86,6 +90,27 @@ export async function exportPdf(project: Project): Promise<Blob> {
     await svg2pdf(plan.svg, doc, { x: MARGIN, y: top, width: DRAW_W, height: DRAW_H });
   } finally {
     plan.dispose();
+  }
+
+  // A clean outline to draw on by hand: walls and openings, nothing else. Dimensions,
+  // room tints and wall letters are all deliberately absent, so whatever gets sketched
+  // over the top stays readable.
+  doc.addPage([PAGE_W, PAGE_H], "landscape");
+  const sketch = renderToSvg(
+    createElement(PlanSvg, {
+      project,
+      width: DRAW_W,
+      height: DRAW_H,
+      showDims: false,
+      showRooms: false,
+      showLabels: false,
+    }),
+  );
+  try {
+    chrome(doc, project, SKETCH_TITLE, 2, total, "Blank plan for sketching by hand");
+    await svg2pdf(sketch.svg, doc, { x: MARGIN, y: top, width: DRAW_W, height: DRAW_H });
+  } finally {
+    sketch.dispose();
   }
 
   for (let i = 0; i < project.walls.length; i += 1) {
@@ -100,10 +125,37 @@ export async function exportPdf(project: Project): Promise<Blob> {
       }),
     );
     try {
-      chrome(doc, project, elevationTitle(project, wall.id), i + 2, total);
+      chrome(doc, project, elevationTitle(project, wall.id), i + 3, total);
       await svg2pdf(page.svg, doc, { x: MARGIN, y: top, width: DRAW_W, height: DRAW_H });
     } finally {
       page.dispose();
+    }
+  }
+
+  for (let i = 0; i < photos.length; i += 1) {
+    const photo = photos[i];
+    doc.addPage([PAGE_W, PAGE_H], "landscape");
+    chrome(
+      doc,
+      project,
+      photoTitle(photo, i),
+      2 + project.walls.length + i + 1,
+      total,
+      photo.name,
+    );
+    const box = fitDimensions(photo.width, photo.height, DRAW_W, DRAW_H);
+    try {
+      doc.addImage(
+        photo.dataUrl,
+        // Centred, so a portrait photo does not sit awkwardly against one margin.
+        MARGIN + (DRAW_W - box.width) / 2,
+        top + (DRAW_H - box.height) / 2,
+        box.width,
+        box.height,
+      );
+    } catch {
+      doc.setFontSize(10);
+      doc.text("This photo could not be drawn.", MARGIN, top + 20);
     }
   }
 

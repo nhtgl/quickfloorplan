@@ -15,10 +15,28 @@ const base = (): Project => chainOfWalls(emptyProject("Flat"), RECT, true);
 const byLabel = (p: Project, l: string) => p.walls.find((w) => w.label === l)!;
 
 describe("pageTitles", () => {
-  it("puts the plan first and one page per wall after it", () => {
+  it("puts the plan first, then the sketch page, then one page per wall", () => {
     const titles = pageTitles(base());
-    expect(titles).toHaveLength(5);
+    expect(titles).toHaveLength(6);
     expect(titles[0]).toBe("Floor Plan");
+    expect(titles[1]).toBe("Sketch Plan");
+    expect(titles.slice(2)).toEqual(["Wall A", "Wall B", "Wall C", "Wall D"]);
+  });
+
+  it("adds a page per photo at the end, titled by its caption", async () => {
+    const { addPhoto, makePhoto } = await import("../model/photos");
+    let p = base();
+    p = addPhoto(p, makePhoto({
+      name: "kitchen.jpg", caption: "Kitchen, looking north",
+      dataUrl: "data:image/jpeg;base64,AAAA", width: 1400, height: 1050,
+    }));
+    p = addPhoto(p, makePhoto({
+      name: "hall.jpg", caption: "",
+      dataUrl: "data:image/jpeg;base64,AAAA", width: 1050, height: 1400,
+    }));
+    const titles = pageTitles(p);
+    expect(titles).toHaveLength(8);
+    expect(titles.slice(-2)).toEqual(["Kitchen, looking north", "Photo 2"]);
   });
 
   it("leaves a wall with no room untitled beyond its label", () => {

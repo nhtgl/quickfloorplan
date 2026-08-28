@@ -80,3 +80,32 @@ describe("serialize / deserialize", () => {
     if (!result.ok) expect(result.error).toMatch(/node/i);
   });
 });
+
+describe("photos in a project file", () => {
+  const withPhoto = (dataUrl: string) => ({
+    ...fullProject(),
+    photos: [
+      { id: "ph1", name: "kitchen.jpg", caption: "", dataUrl, width: 1400, height: 1050 },
+    ],
+  });
+
+  it("round-trips a project carrying photos", () => {
+    const p = withPhoto("data:image/jpeg;base64,AAAA");
+    const result = deserialize(serialize(p));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.project.photos).toEqual(p.photos);
+  });
+
+  it("accepts a file written before photos existed", () => {
+    const { photos, ...withoutPhotos } = fullProject() as never as { photos?: unknown };
+    void photos;
+    const result = deserialize(JSON.stringify(withoutPhotos));
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a photo that does not hold an image, naming it", () => {
+    const result = deserialize(JSON.stringify(withPhoto("https://example.com/x.jpg")));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("kitchen.jpg");
+  });
+})

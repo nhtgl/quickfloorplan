@@ -71,6 +71,20 @@ export function deserialize(json: string): LoadResult {
       return { ok: false, error: `Room "${r.name ?? r.id}" has a malformed outline.` };
     }
   }
+  // Photos are optional: files written before photos existed simply have none.
+  if (p.photos !== undefined) {
+    if (!Array.isArray(p.photos)) {
+      return { ok: false, error: "The photo list in that file is malformed." };
+    }
+    for (const ph of p.photos) {
+      if (typeof ph?.dataUrl !== "string" || !ph.dataUrl.startsWith("data:image/")) {
+        return {
+          ok: false,
+          error: `Photo "${ph?.name ?? ph?.id ?? "?"}" does not hold an image.`,
+        };
+      }
+    }
+  }
 
   return { ok: true, project: p as Project };
 }

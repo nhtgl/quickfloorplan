@@ -5,6 +5,8 @@ import App from "../App";
 import { emptyProject } from "../model/factory";
 import { loopGap, wallLength } from "../model/geometry";
 import { wallMeasuredLength } from "../model/measure";
+import { addPhoto, makePhoto } from "../model/photos";
+import { pageTitles } from "../export/pageTitles";
 import { roomArea } from "../model/rooms";
 import { useStore } from "../state/store";
 
@@ -591,5 +593,96 @@ describe("bringing new work into view", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
     expect(useStore.getState().fitSignal).toBeGreaterThan(before);
+  });
+});
+
+describe("reference photos", () => {
+  const seed = (caption = "") =>
+    act(() =>
+      useStore.getState().apply((p) =>
+        addPhoto(
+          p,
+          makePhoto({
+            name: "kitchen.jpg",
+            caption,
+            dataUrl: "data:image/jpeg;base64,AAAA",
+            width: 1400,
+            height: 1050,
+          }),
+        ),
+      ),
+    );
+
+  async function openPhotos() {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Photos…" }));
+  }
+
+  it("says when there are none", async () => {
+    await openPhotos();
+    expect(screen.getByText("None yet.")).toBeInTheDocument();
+  });
+
+  it("lists a photo with its file name and a caption field", async () => {
+    seed();
+    await openPhotos();
+    const rows = screen.getAllByTestId("photo-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("kitchen.jpg");
+    expect(screen.getByLabelText("Caption for kitchen.jpg")).toBeInTheDocument();
+  });
+
+  it("captions a photo, which titles its page in the PDF", async () => {
+    seed();
+    await openPhotos();
+    await userEvent.type(
+      screen.getByLabelText("Caption for kitchen.jpg"),
+      "Looking north",
+    );
+    const p = useStore.getState().project;
+    expect(p.photos![0].caption).toBe("Looking north");
+    expect(pageTitles(p)).toContain("Looking north");
+  });
+
+  it("removes a photo", async () => {
+    seed();
+    await openPhotos();
+    await userEvent.click(screen.getByRole("button", { name: "Remove kitchen.jpg" }));
+    expect(useStore.getState().project.photos).toEqual([]);
+  });
+
+  it("warns when the photos make the file too big to email comfortably", async () => {
+    act(() =>
+      useStore.getState().apply((p) =>
+        addPhoto(
+          p,
+          makePhoto({
+            name: "huge.jpg",
+            caption: "",
+            dataUrl: `data:image/jpeg;base64,${"A".repeat(5_000_000)}`,
+            width: 1400,
+            height: 1050,
+          }),
+        ),
+      ),
+    );
+    await openPhotos();
+    expect(screen.getByTestId("photo-budget-warning")).toBeInTheDocument();
+  });
+});
+
+describe("the sketch page", () => {
+  it("sits right after the plan, so the two can be compared", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Wall" }));
+    clickPlan(200, 150);
+    clickPlan(600, 150);
+    clickPlan(600, 400);
+    clickPlan(200, 150);
+
+    expect(pageTitles(useStore.getState().project).slice(0, 2)).toEqual([
+      "Floor Plan",
+      "Sketch Plan",
+    ]);
   });
 });

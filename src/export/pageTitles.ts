@@ -1,4 +1,5 @@
 import { roomsForWall } from "../model/rooms";
+import { photoTitle, projectPhotos } from "../model/photos";
 import type { Project } from "../model/types";
 
 /**
@@ -14,6 +15,13 @@ export function elevationTitle(p: Project, wallId: string): string {
   return roomNames.length ? `${base} — ${roomNames.join(" / ")}` : base;
 }
 
+export const SKETCH_TITLE = "Sketch Plan";
+
 export function pageTitles(p: Project): string[] {
-  return ["Floor Plan", ...p.walls.map((w) => elevationTitle(p, w.id))];
+  return [
+    "Floor Plan",
+    SKETCH_TITLE,
+    ...p.walls.map((w) => elevationTitle(p, w.id)),
+    ...projectPhotos(p).map((ph, i) => photoTitle(ph, i)),
+  ];
 }

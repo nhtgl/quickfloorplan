@@ -32,6 +32,7 @@ export type PlanSvgProps = {
   mmPerPx?: number;
   showRooms?: boolean;
   showDims?: boolean;
+  showLabels?: boolean;
   highlightIds?: string[];
   alertIds?: string[];
   overlay?: ReactNode;
@@ -59,6 +60,7 @@ export function PlanSvg(props: PlanSvgProps) {
     height,
     showRooms = true,
     showDims = true,
+    showLabels = true,
     highlightIds = [],
     alertIds = [],
   } = props;
@@ -303,7 +305,8 @@ export function PlanSvg(props: PlanSvgProps) {
           );
         })}
 
-      {p.walls.map((w) => {
+      {showLabels &&
+        p.walls.map((w) => {
         const { a, b } = wallEnds(p, w.id);
         const len = wallLength(p, w.id) || 1;
         const t = labelOffsetAlongWall(p, w.id) / len;

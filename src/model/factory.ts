@@ -15,6 +15,7 @@ export function emptyProject(name = "Untitled"): Project {
     walls: [],
     openings: [],
     rooms: [],
+    photos: [],
     createdAt: now,
     updatedAt: now,
   };

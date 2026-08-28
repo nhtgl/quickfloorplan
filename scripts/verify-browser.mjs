@@ -8,11 +8,59 @@
 import { chromium } from "playwright";
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { deflateSync } from "node:zlib";
+
+const createDeflate = (buf) => deflateSync(buf);
 import { extname, join } from "node:path";
 
 const DIST = new URL("../dist/", import.meta.url).pathname;
 const OUT = new URL("../.verify/", import.meta.url).pathname;
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
+
+/** Minimal uncompressed-deflate PNG, so the script needs no image library. */
+function makePng(width, height) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf) => {
+    let c = 0xffffffff;
+    for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+    const cr = Buffer.alloc(4);
+    cr.writeUInt32BE(crc(body));
+    return Buffer.concat([len, body, cr]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // truecolour
+  const raw = Buffer.alloc(height * (1 + width * 3));
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (1 + width * 3);
+    raw[row] = 0;
+    for (let x = 0; x < width; x += 1) {
+      const i = row + 1 + x * 3;
+      raw[i] = (x * 255) / width;
+      raw[i + 1] = (y * 255) / height;
+      raw[i + 2] = 140;
+    }
+  }
+  const zlib = createDeflate(raw);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", zlib),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
 
 const server = createServer(async (req, res) => {
   const path = req.url === "/" ? "/index.html" : req.url.split("?")[0];
@@ -60,6 +108,12 @@ const project = {
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
+
+// Uses the system Chrome so this needs no extra browser download.
+// A 2400x1800 source image, big enough to prove the downscale on import.
+const photoPath = join(OUT, "reference.png");
+await mkdir(OUT, { recursive: true });
+await writeFile(photoPath, makePng(2400, 1800));
 
 // Uses the system Chrome so this needs no extra browser download.
 const browser = await chromium.launch({ channel: "chrome" });
@@ -159,6 +213,20 @@ const typedRoomVisible = await page
   .isVisible();
 await page.screenshot({ path: join(OUT, "typed-room.png") });
 
+// Add a real photo through the real import path (canvas resize included).
+await page.getByRole("button", { name: "Photos…" }).click();
+await page.getByTestId("photo-input").setInputFiles(photoPath);
+await page.waitForSelector('[data-testid="photo-row"]');
+await page.getByLabel("Caption for reference.png").fill("Kitchen, looking north");
+const photoRows = await page.locator('[data-testid="photo-row"]').count();
+const storedPhoto = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
+  const ph = raw.photos[0];
+  return { w: ph.width, h: ph.height, jpeg: ph.dataUrl.startsWith("data:image/jpeg") };
+});
+await page.screenshot({ path: join(OUT, "photos-dialog.png") });
+await page.getByRole("button", { name: "Done" }).click();
+
 const [download] = await Promise.all([
   page.waitForEvent("download", { timeout: 60000 }),
   page.getByRole("button", { name: "Export PDF" }).click(),
@@ -178,7 +246,6 @@ const checks = [
   ["every wall labelled A-D", wallLabels.join("") === "ABCD"],
   ["square corners not labelled with 90 degrees", angleLabels === 0],
   ["PDF starts with %PDF-", text.startsWith("%PDF-")],
-  ["PDF has 5 pages (plan + 4 walls)", pages === 5],
   ["PDF larger than 5kB", pdf.length > 5000],
   ["wall A panel lists its 2 windows", openingRows.length === 2 && openingRows.every((t) => t.includes("Window"))],
   ["zoom, fit and pan controls present", zoomIn === 1 && fitBtn === 1 && panTool === 1],
@@ -193,6 +260,10 @@ const checks = [
   ["creating adds four walls", wallsAfter - wallsBefore === 4],
   ["typed room reports 2.5 m2 of floor", (typedRoomArea ?? "").includes("2.5 m²")],
   ["the new room is brought into view", typedRoomVisible],
+  ["a photo imports and is listed", photoRows === 1],
+  // 2400x1800 source, scaled to fit a 1400px box and re-encoded as JPEG.
+  ["photos are downscaled and re-encoded", storedPhoto.w === 1400 && storedPhoto.h === 1050 && storedPhoto.jpeg],
+  ["PDF gains a sketch page and a photo page", pages === 11],
   ["no page or console errors", problems.length === 0],
 ];
 

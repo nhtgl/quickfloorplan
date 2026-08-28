@@ -214,3 +214,29 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 .readout { font-size: 13px; color: var(--dim); margin: 0 0 14px; }
 .readout .alert { color: var(--alert); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.modal-actions.left { justify-content: flex-start; align-items: center; gap: 12px; margin-bottom: 10px; }
+
+.photo-list { list-style: none; margin: 4px 0 16px; padding: 0; }
+.photo-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.photo-list img {
+  width: 92px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 5px;
+  background: var(--chrome);
+  flex-shrink: 0;
+}
+.photo-fields { flex: 1; min-width: 0; }
+.photo-fields input { width: 100%; margin-bottom: 3px; }
+.photo-fields .hint { font-size: 12px; }
+.photo-buttons { display: flex; gap: 4px; flex-shrink: 0; }
+.photo-buttons button { padding: 4px 9px; }

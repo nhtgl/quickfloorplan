@@ -79,10 +79,21 @@ that double-count area: all of these are flagged and none of them stop you savin
 exporting. Numbers taken off a tape are inconsistent halfway through, and a tool that
 refuses to save until everything is perfect is a tool people abandon.
 
+**Photos…** attaches reference photos. They are scaled down on the way in and stored inside
+the project file, so a project stays one thing you can send to someone. Each gets its own page
+at the back of the PDF, titled by its caption. The dialog shows the running file size and says
+so when the photos are making the file awkward to email.
+
 ## The PDF
 
 Page 1 is the plan: every wall dimensioned and lettered, rooms tinted with names and areas,
-door swings drawn. Then one page per wall, titled with the rooms it faces ("Wall C — Kitchen
+door swings drawn.
+
+Page 2 is the same plan stripped back to walls and openings — no dimensions, no room tints, no
+wall letters — for sketching a layout on by hand. Whatever gets drawn over it stays readable
+because there is nothing underneath competing with it.
+
+Then one page per wall, titled with the rooms it faces ("Wall C — Kitchen
 / Hall"), showing that wall face on with each opening's height and sill.
 
 Any wall with an opening in it carries a **setting-out chain**: corner to the first opening,
@@ -93,6 +104,8 @@ the same faces as the overall, so switching between inside and outside moves bot
 in blue. Overlapping openings are merged into one segment rather than listed separately: a
 chain that does not add up is worse than no chain, and the overlap is already flagged as a
 warning.
+
+Reference photos come last, one to a page.
 
 Pages are scaled to fit, not drawn at 1:50, so the footer says so. Read the numbers, don't
 measure the printout.
