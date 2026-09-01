@@ -245,6 +245,26 @@ const firstFace = page.locator('[data-testid="wall-faces"] input').first();
 await firstFace.fill("30");
 await firstFace.blur();
 await page.waitForTimeout(150);
+// A half centimetre must survive the number input, which validates against its step.
+await firstFace.fill("30.5");
+await firstFace.blur();
+await page.waitForTimeout(120);
+const halfCmStored = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
+  return raw.walls.find((w) => w.label === "A").offsets.left;
+});
+const halfCmShown = await page
+  .locator('[data-testid="wall-faces"] input')
+  .first()
+  .inputValue();
+const halfCmValid = await page
+  .locator('[data-testid="wall-faces"] input')
+  .first()
+  .evaluate((el) => el.checkValidity());
+await firstFace.fill("30");
+await firstFace.blur();
+await page.waitForTimeout(120);
+
 const afterFaces = await page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem("quickfloorplan.autosave.v1"));
   return raw.walls.find((w) => w.label === "A").offsets;
@@ -419,6 +439,9 @@ const checks = [
   ["typing one face length leaves the other two lines alone", linesAfter[2] === 450 && linesAfter[0] === linesBefore[0] && linesAfter[1] === linesBefore[1]],
   ["a wall with different face lengths is drawn as a slanted outline", slantedCorners === true],
   ["editing one face leaves the other alone", afterFaces.left === 300 && afterFaces.right === beforeFaces.right],
+  ["a half centimetre is stored, not rounded away", halfCmStored === 305],
+  ["and reads back as typed rather than rounded", halfCmShown === "30.5"],
+  ["the number input accepts it instead of rejecting the step", halfCmValid === true],
   ["drawing catches a wall face, not only its centreline", snapKind === "face"],
   ["no page or console errors", problems.length === 0],
 ];

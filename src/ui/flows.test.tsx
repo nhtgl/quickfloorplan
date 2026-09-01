@@ -1278,3 +1278,72 @@ describe("choosing which face each wall's elevation shows", () => {
     expect(screen.queryByRole("dialog", { name: "Export PDF" })).toBeNull();
   });
 });
+
+describe("measurements finer than a whole centimetre", () => {
+  async function selectedWall() {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+    await userEvent.type(screen.getByTestId("room-name-input"), "Study");
+    await userEvent.type(screen.getByTestId("measurements-input"), "400,90,300,90,400,90,300,90");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    const id = useStore.getState().project.walls[0].id;
+    act(() => useStore.getState().select({ kind: "wall", id }));
+    return id;
+  }
+
+  it("keeps a half centimetre typed into a face offset", async () => {
+    const id = await selectedWall();
+    const field = await screen.findByLabelText("Study side");
+    await userEvent.clear(field);
+    await userEvent.type(field, "9.5");
+    fireEvent.blur(field);
+
+    expect(useStore.getState().project.walls.find((w) => w.id === id)!.offsets.left).toBe(95);
+  });
+
+  it("reads a half centimetre back rather than rounding it on the way to the screen", async () => {
+    const id = await selectedWall();
+    const field = await screen.findByLabelText("Study side");
+    await userEvent.clear(field);
+    await userEvent.type(field, "9.5");
+    fireEvent.blur(field);
+
+    act(() => useStore.getState().select({ kind: "wall", id }));
+    expect(await screen.findByLabelText("Study side")).toHaveValue(9.5);
+  });
+
+  it("does not drift when the same value is committed twice", async () => {
+    const id = await selectedWall();
+    for (let i = 0; i < 3; i += 1) {
+      act(() => useStore.getState().select({ kind: "wall", id }));
+      const field = await screen.findByLabelText("Study side");
+      fireEvent.blur(field);
+    }
+    // Re-committing what the field already showed must not move the wall.
+    expect(useStore.getState().project.walls.find((w) => w.id === id)!.offsets.left).toBe(50);
+  });
+
+  it("keeps a millimetre typed into a length", async () => {
+    const id = await selectedWall();
+    const field = await screen.findByLabelText("Centreline");
+    await userEvent.clear(field);
+    await userEvent.type(field, "412.3");
+    fireEvent.blur(field);
+
+    expect(wallLength(useStore.getState().project, id)).toBe(4123);
+  });
+
+  it("keeps a millimetre when the project is in metres", async () => {
+    const id = await selectedWall();
+    await userEvent.selectOptions(screen.getByLabelText("Units"), "m");
+    act(() => useStore.getState().select({ kind: "wall", id }));
+
+    const field = await screen.findByLabelText("Centreline");
+    await userEvent.clear(field);
+    await userEvent.type(field, "4.123");
+    fireEvent.blur(field);
+
+    expect(wallLength(useStore.getState().project, id)).toBe(4123);
+  });
+});

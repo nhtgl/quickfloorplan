@@ -15,17 +15,27 @@ describe("units", () => {
     expect(DEFAULT_UNIT).toBe("cm");
   });
 
-  it("formats millimetres as whole centimetres", () => {
+  it("formats whole centimetres without a pointless decimal", () => {
     expect(formatLength(4200, "cm")).toBe("420");
     expect(formatLength(0, "cm")).toBe("0");
-    expect(formatLength(4204, "cm")).toBe("420");
     expect(formatLengthWithUnit(4200, "cm")).toBe("420 cm");
   });
 
-  it("formats millimetres as metres to 2dp", () => {
+  it("keeps a half centimetre rather than rounding it away", () => {
+    expect(formatLength(905, "cm")).toBe("90.5");
+    expect(formatLength(4204, "cm")).toBe("420.4");
+    expect(formatLengthWithUnit(905, "cm")).toBe("90.5 cm");
+  });
+
+  it("formats metres to 2dp, as a measurement is usually written", () => {
     expect(formatLength(4200, "m")).toBe("4.20");
-    expect(formatLength(12345, "m")).toBe("12.35");
+    expect(formatLength(12350, "m")).toBe("12.35");
     expect(formatLengthWithUnit(4200, "m")).toBe("4.20 m");
+  });
+
+  it("shows a stray millimetre in metres rather than losing it", () => {
+    expect(formatLength(4205, "m")).toBe("4.205");
+    expect(formatLength(12345, "m")).toBe("12.345");
   });
 
   it("parses typed values back to integer millimetres", () => {
@@ -35,13 +45,23 @@ describe("units", () => {
     expect(parseLength(4.2044, "m")).toBe(4204);
   });
 
-  it("round-trips a whole centimetre", () => {
-    expect(formatLength(parseLength(315, "cm"), "cm")).toBe("315");
+  it("round-trips whatever was typed, so a second edit does not shift it", () => {
+    for (const [typed, unit] of [
+      [315, "cm"],
+      [90.5, "cm"],
+      [420.4, "cm"],
+      [4.2, "m"],
+      [4.205, "m"],
+    ] as const) {
+      const stored = parseLength(typed, unit);
+      // Reading the field back and committing it again must land on the same millimetre.
+      expect(parseLength(Number(formatLength(stored, unit)), unit)).toBe(stored);
+    }
   });
 
-  it("steps by one centimetre or one centimetre's worth of a metre", () => {
-    expect(stepFor("cm")).toBe(1);
-    expect(stepFor("m")).toBe(0.01);
+  it("steps by a millimetre, so a number input accepts one", () => {
+    expect(stepFor("cm")).toBe(0.1);
+    expect(stepFor("m")).toBe(0.001);
   });
 
   it("keeps areas in square metres whatever the length unit", () => {
