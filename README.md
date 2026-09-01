@@ -104,7 +104,8 @@ before anything is added, says whether it closes, and reports the floor area. Le
 as whatever the Measure control says, so typed inside dimensions come out as inside dimensions.
 
 Measurements are in **centimetres** by default, which is how a tape gets read and written
-down. The Units control in the toolbar switches the whole project to metres. Room areas stay
+down. Anything down to a millimetre can be typed — 90.5 cm, or 4.205 m — and
+reads back exactly as entered rather than being rounded on the way to the screen. The Units control in the toolbar switches the whole project to metres. Room areas stay
 in m² either way, because a room in square centimetres is a six-digit number nobody can read.
 
 **Every dimension on the plan is a measurement of a face**, drawn along that face and running
