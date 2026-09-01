@@ -8,6 +8,7 @@ import {
   wallPolygon,
   wallSideNames,
   faceIsWorthDimensioning,
+  wallElevationSides,
 } from "./faces";
 import {
   centrelineForSideLength,
@@ -377,5 +378,36 @@ describe("which faces are worth dimensioning", () => {
     // Whichever of the two back-to-back faces has no room is not worth a second string.
     const sides = [1, -1].map((side) => faceIsWorthDimensioning(p, wall(p, "B"), side));
     expect(sides).toContain(false);
+  });
+});
+
+describe("which face an elevation shows", () => {
+  it("follows the project's measure setting when the wall says nothing", () => {
+    const inside: Project = { ...rect(), measureFrom: "inside" };
+    expect(wallElevationSides(inside, wall(inside, "A"))).toEqual([1]);
+    const outside: Project = { ...rect(), measureFrom: "outside" };
+    expect(wallElevationSides(outside, wall(outside, "A"))).toEqual([-1]);
+  });
+
+  it("takes the inside for a wall enclosing nothing to measure from", () => {
+    const open = chainOfWalls(
+      emptyProject("t"),
+      [{ x: 0, y: 0 }, { x: 4000, y: 0 }],
+      false,
+      100,
+    );
+    expect(wallElevationSides(open, open.walls[0].id)).toEqual([1]);
+  });
+
+  it("takes the wall's own choice over the project's", () => {
+    const p: Project = { ...rect(), measureFrom: "inside" };
+    p.walls[0] = { ...p.walls[0], elevationFace: "right" };
+    expect(wallElevationSides(p, p.walls[0].id)).toEqual([-1]);
+  });
+
+  it("gives a wall a page per side when asked for both", () => {
+    const p = rect();
+    p.walls[0] = { ...p.walls[0], elevationFace: "both" };
+    expect(wallElevationSides(p, p.walls[0].id)).toEqual([1, -1]);
   });
 });

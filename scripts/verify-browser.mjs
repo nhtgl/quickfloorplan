@@ -356,9 +356,17 @@ const arcsAfterMove = await page.locator('.stage [data-testid="door-arc"]').coun
 const sharedCuts = await page.locator('.stage [data-testid="shared-opening-cut"]').count();
 await page.screenshot({ path: join(OUT, "rooms-snapped.png") });
 
+await page.getByRole("button", { name: "Export PDF" }).click();
+const exportRows = await page.locator('[data-testid="export-wall-row"]').count();
+const pagesBefore = await page.getByTestId("export-page-count").textContent();
+// Wall B is the one the second room came to share: draw both of its faces.
+await page.getByRole("button", { name: "Wall B: Both" }).click();
+const pagesAfter = await page.getByTestId("export-page-count").textContent();
+await page.screenshot({ path: join(OUT, "export-dialog.png") });
+
 const [download] = await Promise.all([
   page.waitForEvent("download", { timeout: 60000 }),
-  page.getByRole("button", { name: "Export PDF" }).click(),
+  page.getByRole("button", { name: "Export", exact: true }).click(),
 ]);
 const pdfPath = join(OUT, "verification.pdf");
 await download.saveAs(pdfPath);
@@ -395,7 +403,9 @@ const checks = [
   ["a photo imports and is listed", photoRows === 1],
   // 2400x1800 source, scaled to fit a 1400px box and re-encoded as JPEG.
   ["photos are downscaled and re-encoded", storedPhoto.w === 1400 && storedPhoto.h === 1050 && storedPhoto.jpeg],
-  ["PDF gains a sketch page and a photo page", pages === 11],
+  ["every wall is listed with a choice of face", exportRows === 8],
+  ["asking for both faces of a wall adds a page", pagesBefore !== pagesAfter],
+  ["PDF gains a sketch page, a photo page and the extra face", pages === 12],
   ["dragging a room shows a snap guide", dragGuides > 0],
   ["the dragged room lands flush against the other", edgesAfter.movingLeft === edgesAfter.stationaryRight],
   ["no second door is created when rooms meet", openingsAfter.total === 4],

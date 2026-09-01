@@ -1,7 +1,7 @@
 import { loopSignedArea, pointAlongWall, wallById, wallEnds } from "./geometry";
 import { coincidentWalls } from "./sharedOpenings";
 import { roomsInLoop } from "./loops";
-import { wallSpanForSide } from "./measure";
+import { wallFaceSign, wallSpanForSide } from "./measure";
 import type { Point, Project, Room, WallId } from "./types";
 import { offsetForSide } from "./walls";
 
@@ -174,4 +174,16 @@ export function facePointAt(
   const off = side * offsetForSide(wall, side);
   const on = pointAlongWall(p, id, distance);
   return { x: on.x + nx * off, y: on.y + ny * off };
+}
+
+/** Which sides of a wall get an elevation page, in the order they are drawn. */
+export function wallElevationSides(p: Project, id: WallId): number[] {
+  const wall = wallById(p, id);
+  if (wall.elevationFace === "left") return [1];
+  if (wall.elevationFace === "right") return [-1];
+  if (wall.elevationFace === "both") return [1, -1];
+  // Unset: whichever face the project measures from, and the inside for a wall that
+  // encloses nothing to measure from.
+  const sign = wallFaceSign(p, id);
+  return [sign === 0 ? 1 : sign];
 }

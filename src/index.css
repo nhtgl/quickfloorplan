@@ -259,3 +259,17 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 .lines { margin-top: 4px; }
 .lines h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); margin: 0 0 10px; }
 .lines .hint { font-size: 12px; margin: 2px 0 0; }
+
+.wall-faces-list { list-style: none; margin: 4px 0 14px; padding: 0; max-height: 240px; overflow-y: auto; }
+.wall-faces-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.wall-faces-list li:last-child { border-bottom: none; }
+.choices { display: flex; gap: 3px; }
+.choice { font-size: 12px; padding: 4px 9px; }
+.choice.on { background: var(--accent); border-color: var(--accent); color: #fff; }

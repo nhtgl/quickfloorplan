@@ -215,13 +215,50 @@ describe("ElevationSvg", () => {
     const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
       (n) => n.textContent,
     );
-    expect(labels).toContain("420 cm");
+    // An elevation always shows one of the wall's faces: nobody can stand on a
+    // centreline, so even a project measuring centrelines draws a face here.
+    expect(labels).toContain("410 cm");
     expect(labels).toContain("260 cm");
     expect(labels).toContain("sill 90 cm");
     // The chain carries the opening width and the solid runs either side of it.
     expect(labels).toContain("120 cm");
-    expect(labels).toContain("90 cm");
-    expect(labels).toContain("210 cm");
+    expect(labels).toContain("85 cm");
+    expect(labels).toContain("205 cm");
+  });
+
+  it("mirrors the drawing when it shows the far face", () => {
+    const p = base();
+    p.openings = [
+      {
+        id: newId("o"),
+        wallId: p.walls[0].id,
+        kind: "window",
+        offset: 900,
+        width: 600,
+        height: 1400,
+        sill: 900,
+      },
+    ];
+    const near = render(
+      <ElevationSvg project={p} wallId={p.walls[0].id} side={1} width={800} height={500} />,
+    );
+    const far = render(
+      <ElevationSvg project={p} wallId={p.walls[0].id} side={-1} width={800} height={500} />,
+    );
+
+    const openingX = (c: HTMLElement) =>
+      Number(
+        c
+          .querySelector('[data-testid="elevation-opening"] rect')!
+          .getAttribute("x"),
+      );
+
+    // The window sits 90cm from one end of a 420cm wall. Seen from the far side it is
+    // near the other end instead, because the wall's two ends have swapped places.
+    const nearX = openingX(near.container);
+    const farX = openingX(far.container);
+    expect(nearX).toBeLessThan(1000);
+    expect(farX).toBeGreaterThan(3000);
   });
 
   it("omits the sill dimension for a door sitting on the floor", () => {
@@ -277,5 +314,40 @@ describe("dimension placement with more than one room", () => {
 
     // Both faces of every wall: neither room here has anything back to back with it.
     expect(container.querySelectorAll('[data-testid="face-dimensions"]')).toHaveLength(16);
+  });
+});
+
+describe("a mirrored elevation", () => {
+  it("keeps its dimension chain below the floor, not up the wall", () => {
+    const p = base();
+    p.openings = [
+      {
+        id: newId("o"),
+        wallId: p.walls[0].id,
+        kind: "window",
+        offset: 900,
+        width: 600,
+        height: 1400,
+        sill: 900,
+      },
+    ];
+
+    const chainY = (side: number) => {
+      const { container } = render(
+        <ElevationSvg project={p} wallId={p.walls[0].id} side={side} width={800} height={500} />,
+      );
+      const wallBottom = Number(
+        container.querySelector('[data-testid="wall-face"]')!.getAttribute("y"),
+      ) + Number(container.querySelector('[data-testid="wall-face"]')!.getAttribute("height"));
+      // The chain segments are the dimension groups tagged as solid or opening.
+      const label = container.querySelector('[data-kind="opening"] text')!;
+      return { labelY: Number(label.getAttribute("y")), wallBottom };
+    };
+
+    for (const side of [1, -1]) {
+      const { labelY, wallBottom } = chainY(side);
+      // Below the foot of the wall in both directions.
+      expect(labelY).toBeGreaterThan(wallBottom);
+    }
   });
 });

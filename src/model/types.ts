@@ -48,6 +48,12 @@ export type Wall = {
   offsets: WallOffsets;
   /** Face adjustments at each end. Absent means both ends are square to the wall. */
   ends?: { a: EndAdjust; b: EndAdjust };
+  /**
+   * Which face the wall's elevation page shows. Absent follows the project's Measure
+   * setting. "both" gives the wall a page per side, which is what a wall between two
+   * rooms usually wants.
+   */
+  elevationFace?: "left" | "right" | "both";
   /** mm; falls back to Project.defaultWallHeight */
   height?: number;
   /** "A", "B", ... "Z", "AA"; never reassigned once given out. */

@@ -180,8 +180,14 @@ Page 2 is the same plan stripped back to walls and openings — no dimensions, n
 wall letters — for sketching a layout on by hand. Whatever gets drawn over it stays readable
 because there is nothing underneath competing with it.
 
-Then one page per wall, titled with the rooms it faces ("Wall C — Kitchen
-/ Hall"), showing that wall face on with each opening's height and sill.
+**Export PDF** asks which face of each wall to draw before it exports. A wall between two
+rooms usually wants both, which gives it a page per side; anything else usually wants only
+the side you measured. The choice is remembered with the project.
+
+Then one page per wall face, titled with the rooms it faces ("Wall C — Kitchen
+/ Hall"), showing that wall face on with each opening's height and sill. A page showing the
+far face is mirrored, because standing on the other side of a wall puts its two ends the other
+way round — an unmirrored drawing would be a reflection of what the reader is looking at.
 
 Any wall with an opening in it carries a **setting-out chain**: corner to the first opening,
 the opening itself, the solid stretch to the next, and so on to the far corner, with the

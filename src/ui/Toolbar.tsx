@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { MeasurementsDialog } from "./MeasurementsDialog";
 import { PhotosDialog } from "./PhotosDialog";
+import { ExportDialog } from "./ExportDialog";
 import { emptyProject } from "../model/factory";
 import { formatLength, parseLength, stepFor, type Unit } from "../model/units";
 import { projectUnit } from "../model/factory";
 import { projectMeasureFrom, type MeasureFrom } from "../model/measure";
 import { openProject, saveProject } from "../file/io";
-import { exportPdf, pdfFileName } from "../export/pdf";
 import { useStore, type Tool } from "../state/store";
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
@@ -27,29 +27,11 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
   const reset = useStore((s) => s.reset);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
-  const [busy, setBusy] = useState(false);
   const [typing, setTyping] = useState(false);
   const [photos, setPhotos] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const unit = projectUnit(project);
   const measureFrom = projectMeasureFrom(project);
-
-  async function doExport() {
-    setBusy(true);
-    try {
-      const blob = await exportPdf(project);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = pdfFileName(project);
-      a.click();
-      URL.revokeObjectURL(url);
-      onNotify(`Exported ${1 + project.walls.length} pages.`);
-    } catch (err) {
-      onNotify(`Could not export: ${(err as Error).message}`, true);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function doOpen() {
     const result = await openProject();
@@ -145,12 +127,15 @@ export function Toolbar({ onNotify }: { onNotify: (msg: string, bad?: boolean) =
         <button onClick={() => reset(emptyProject("Untitled"))}>New</button>
         <button onClick={doOpen}>Open</button>
         <button onClick={() => saveProject(project).catch(() => undefined)}>Save</button>
-        <button className="primary" onClick={doExport} disabled={busy}>
-          {busy ? "Exporting…" : "Export PDF"}
+        <button className="primary" onClick={() => setExporting(true)}>
+          Export PDF
         </button>
       </div>
       {typing && <MeasurementsDialog onClose={() => setTyping(false)} />}
       {photos && <PhotosDialog onClose={() => setPhotos(false)} />}
+      {exporting && (
+        <ExportDialog onClose={() => setExporting(false)} onNotify={onNotify} />
+      )}
     </header>
   );
 }

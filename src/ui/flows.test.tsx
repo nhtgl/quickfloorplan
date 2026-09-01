@@ -1206,3 +1206,75 @@ describe("editing a wall's lengths", () => {
     expect(wallLengthForSide(useStore.getState().project, id, 0)).toBe(3500);
   });
 });
+
+describe("choosing which face each wall's elevation shows", () => {
+  async function aRoom() {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Room from sizes…" }));
+    await userEvent.type(screen.getByTestId("room-name-input"), "Study");
+    await userEvent.type(screen.getByTestId("measurements-input"), "400,90,300,90,400,90,300,90");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await userEvent.click(screen.getByRole("button", { name: "Export PDF" }));
+  }
+
+  it("lists every wall with a choice of face", async () => {
+    await aRoom();
+    expect(screen.getByRole("dialog", { name: "Export PDF" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("export-wall-row")).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "Wall A: Study" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wall A: Outside" })).toBeInTheDocument();
+  });
+
+  it("shows which face a wall will use before anything is chosen", async () => {
+    await aRoom();
+    // The project measures inside faces, so that is what is already selected.
+    expect(screen.getByRole("button", { name: "Wall A: Study" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("switches one wall to its other face without touching the rest", async () => {
+    await aRoom();
+    await userEvent.click(screen.getByRole("button", { name: "Wall A: Outside" }));
+
+    const walls = useStore.getState().project.walls;
+    expect(walls[0].elevationFace).toBe("right");
+    expect(walls[1].elevationFace).toBeUndefined();
+  });
+
+  it("gives a wall two pages when both faces are asked for", async () => {
+    await aRoom();
+    const before = pageTitles(useStore.getState().project).length;
+    await userEvent.click(screen.getByRole("button", { name: "Wall A: Both" }));
+
+    const titles = pageTitles(useStore.getState().project);
+    expect(titles).toHaveLength(before + 1);
+    // The two pages say which side each one shows.
+    expect(titles.filter((t) => t.includes("Wall A"))).toEqual([
+      "Wall A — Study (from the Study side)",
+      "Wall A — Study (from the Outside side)",
+    ]);
+  });
+
+  it("sets every wall at once", async () => {
+    await aRoom();
+    await userEvent.click(screen.getByRole("button", { name: "Both faces" }));
+    expect(
+      useStore.getState().project.walls.every((w) => w.elevationFace === "both"),
+    ).toBe(true);
+    // Four walls, two sides each, plus the plan and the sketch page.
+    expect(pageTitles(useStore.getState().project)).toHaveLength(10);
+  });
+
+  it("says how many pages will come out", async () => {
+    await aRoom();
+    expect(screen.getByTestId("export-page-count")).toHaveTextContent("6 pages");
+  });
+
+  it("leaves the project alone when cancelled", async () => {
+    await aRoom();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Export PDF" })).toBeNull();
+  });
+});

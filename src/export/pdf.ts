@@ -10,7 +10,7 @@ import { projectUnit } from "../model/factory";
 import type { Project } from "../model/types";
 import { unitName } from "../model/units";
 import { fitDimensions, photoTitle, projectPhotos } from "../model/photos";
-import { elevationTitle, SKETCH_TITLE } from "./pageTitles";
+import { elevationPages, elevationTitle, SKETCH_TITLE } from "./pageTitles";
 
 // A4 landscape in points.
 const PAGE_W = 841.89;
@@ -79,7 +79,8 @@ function chrome(
 export async function exportPdf(project: Project): Promise<Blob> {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const photos = projectPhotos(project);
-  const total = 2 + project.walls.length + photos.length;
+  const elevations = elevationPages(project);
+  const total = 2 + elevations.length + photos.length;
   const top = MARGIN + TITLE_H;
 
   const plan = renderToSvg(
@@ -113,19 +114,20 @@ export async function exportPdf(project: Project): Promise<Blob> {
     sketch.dispose();
   }
 
-  for (let i = 0; i < project.walls.length; i += 1) {
-    const wall = project.walls[i];
+  for (let i = 0; i < elevations.length; i += 1) {
+    const { wallId, side } = elevations[i];
     doc.addPage([PAGE_W, PAGE_H], "landscape");
     const page = renderToSvg(
       createElement(ElevationSvg, {
         project,
-        wallId: wall.id,
+        wallId,
+        side,
         width: DRAW_W,
         height: DRAW_H,
       }),
     );
     try {
-      chrome(doc, project, elevationTitle(project, wall.id), i + 3, total);
+      chrome(doc, project, elevationTitle(project, wallId, side), i + 3, total);
       await svg2pdf(page.svg, doc, { x: MARGIN, y: top, width: DRAW_W, height: DRAW_H });
     } finally {
       page.dispose();
@@ -139,7 +141,7 @@ export async function exportPdf(project: Project): Promise<Blob> {
       doc,
       project,
       photoTitle(photo, i),
-      2 + project.walls.length + i + 1,
+      2 + elevations.length + i + 1,
       total,
       photo.name,
     );

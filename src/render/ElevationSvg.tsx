@@ -1,6 +1,6 @@
 import { wallById, wallHeight } from "../model/geometry";
 import { projectUnit } from "../model/factory";
-import { wallFaceSign, wallMeasuredLength, wallSpanForSide } from "../model/measure";
+import { wallFaceSign, wallSpanForSide } from "../model/measure";
 import { wallDimensionChain } from "../model/openings";
 import { wallOpeningViews } from "../model/sharedOpenings";
 import type { Project, WallId } from "../model/types";
@@ -14,6 +14,8 @@ export type ElevationSvgProps = {
   wallId: WallId;
   width: number;
   height: number;
+  /** +1 for the left-hand face, -1 for the right. Defaults to the measured face. */
+  side?: number;
   highlightIds?: string[];
   alertIds?: string[];
   svgRef?: (el: SVGSVGElement | null) => void;
@@ -35,10 +37,15 @@ export function ElevationSvg(props: ElevationSvgProps) {
   const { project: p, wallId, width, height, highlightIds = [], alertIds = [] } = props;
   const wall = wallById(p, wallId);
   // The drawing shows the measured face, so x runs from that face's start, not the node.
-  const side = wallFaceSign(p, wallId);
+  const rawSide = props.side ?? wallFaceSign(p, wallId);
+  const side = rawSide === 0 ? 1 : rawSide;
   const span = wallSpanForSide(p, wallId, side);
-  const len = wallMeasuredLength(p, wallId);
-  const along = (centrelineDistance: number) => centrelineDistance - span.start;
+  const len = span.end - span.start;
+  // Standing on the far side of a wall puts its two ends the other way round, so the
+  // right-hand face is drawn mirrored. Otherwise the page would show a reflection of
+  // what the person holding the tape is looking at.
+  const along = (centrelineDistance: number) =>
+    side < 0 ? span.end - centrelineDistance : centrelineDistance - span.start;
   const h = wallHeight(p, wallId);
   // Includes the openings of any wall lying on this one, so a door between two rooms
   // shows on both rooms' elevations without being stored twice.
@@ -80,12 +87,12 @@ export function ElevationSvg(props: ElevationSvgProps) {
 
       {openings.map((view) => {
         const o = view.opening;
-        const r = {
-          x: along(Math.round(view.offset - o.width / 2)),
-          y: o.sill,
-          w: o.width,
-          h: o.height,
-        };
+        // Mirroring swaps which end of the opening comes first, so take the leftmost.
+        const ends = [
+          along(Math.round(view.offset - o.width / 2)),
+          along(Math.round(view.offset + o.width / 2)),
+        ];
+        const r = { x: Math.min(...ends), y: o.sill, w: o.width, h: o.height };
         const alert = alertIds.includes(o.id);
         const selected = highlightIds.includes(o.id);
         const colour = alert ? ALERT : selected ? ACCENT : WALL;
@@ -142,7 +149,9 @@ export function ElevationSvg(props: ElevationSvgProps) {
             from={{ x: along(seg.start), y: up(0) }}
             to={{ x: along(seg.end), y: up(0) }}
             label={formatLengthWithUnit(Math.round(seg.end - seg.start), unit)}
-            offset={26 * mmPerPx}
+            // A mirrored drawing runs the chain right to left, which flips the side its
+            // dimension line falls on. Negate it so it stays below the floor either way.
+            offset={(side < 0 ? -26 : 26) * mmPerPx}
             mmPerPx={mmPerPx}
             color={seg.kind === "opening" ? ACCENT : undefined}
           />
