@@ -27,6 +27,7 @@ const KIND_LABEL: Record<string, string> = {
   door: "Door",
   window: "Window",
   passage: "Opening",
+  vent: "Vent",
 };
 
 /**
@@ -109,17 +110,55 @@ export function ElevationSvg(props: ElevationSvgProps) {
               onClick={() => props.onPickOpening?.(o.id)}
               style={{ cursor: props.onPickOpening ? "pointer" : undefined }}
             />
-            <text
-              x={r.x + r.w / 2}
-              y={up(r.y + r.h / 2) + 6 * mmPerPx}
-              fill={DIM}
-              fontSize={10 * mmPerPx}
-              fontFamily="Helvetica, Arial, sans-serif"
-              textAnchor="middle"
-              style={{ pointerEvents: "none" }}
-            >
-              {KIND_LABEL[o.kind]}
-            </text>
+            {o.kind === "vent" && (
+              // Hatched rather than open: a vent is a grille, not something to see through.
+              <g data-testid="vent-hatch">
+                {[0.25, 0.5, 0.75].map((t) => (
+                  <line
+                    key={t}
+                    x1={r.x}
+                    y1={up(r.y + r.h * t)}
+                    x2={r.x + r.w * (1 - t)}
+                    y2={up(r.y + r.h)}
+                    stroke={colour}
+                    strokeWidth={hairline}
+                  />
+                ))}
+                {[0.25, 0.5, 0.75].map((t) => (
+                  <line
+                    key={`b${t}`}
+                    x1={r.x + r.w * t}
+                    y1={up(r.y)}
+                    x2={r.x + r.w}
+                    y2={up(r.y + r.h * (1 - t))}
+                    stroke={colour}
+                    strokeWidth={hairline}
+                  />
+                ))}
+              </g>
+            )}
+            {/* A vent is only a hand's width across, so its name will not fit inside it.
+                Anything too narrow is labelled just above instead of over the top. */}
+            {(() => {
+              const label = KIND_LABEL[o.kind];
+              const font = 10 * mmPerPx;
+              const fits = label.length * font * 0.6 < r.w;
+              return (
+                <text
+                  data-testid="opening-label"
+                  data-placement={fits ? "inside" : "above"}
+                  x={r.x + r.w / 2}
+                  y={fits ? up(r.y + r.h / 2) + 6 * mmPerPx : up(r.y + r.h) - 6 * mmPerPx}
+                  fill={DIM}
+                  fontSize={font}
+                  fontFamily="Helvetica, Arial, sans-serif"
+                  textAnchor="middle"
+                  style={{ pointerEvents: "none" }}
+                >
+                  {label}
+                </text>
+              );
+            })()}
             <DimLine
               from={{ x: r.x + r.w, y: up(r.y) }}
               to={{ x: r.x + r.w, y: up(r.y + r.h) }}

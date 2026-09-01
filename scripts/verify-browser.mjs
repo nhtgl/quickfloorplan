@@ -100,6 +100,7 @@ const project = {
     { id: "o1", wallId: "w1", kind: "window", offset: 1600, width: 1400, height: 1500, sill: 850 },
     { id: "o2", wallId: "w1", kind: "window", offset: 3800, width: 1000, height: 1500, sill: 850 },
     { id: "o3", wallId: "w4", kind: "door", offset: 1700, width: 900, height: 2050, sill: 0, hinge: "a", swing: "in" },
+    { id: "o5", wallId: "w3", kind: "vent", offset: 2600, width: 150, height: 150, sill: 2200 },
     { id: "o4", wallId: "w2", kind: "door", offset: 1700, width: 1100, height: 2100, sill: 0, hinge: "a", swing: "in" },
   ],
   rooms: [
@@ -401,6 +402,7 @@ const checks = [
   ["shared room boundary drawn dashed, once per room", notional === 2],
   // The front door and the door in the wall the second room will come to share.
   ["both doors draw a swing arc", doorArcs === 2],
+  ["a vent is marked on the wall, not cut through it", ventMarks === 1],
   ["every wall labelled A-D", wallLabels.join("") === "ABCD"],
   ["square corners not labelled with 90 degrees", angleLabels === 0],
   ["PDF starts with %PDF-", text.startsWith("%PDF-")],

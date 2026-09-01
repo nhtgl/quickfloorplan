@@ -208,7 +208,8 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1.1 : 1 / 1.1);
   }
 
-  const pickOpeningTool = tool === "door" || tool === "window" || tool === "passage";
+  const pickOpeningTool =
+    tool === "door" || tool === "window" || tool === "passage" || tool === "vent";
 
   const overlay = (
     <g data-testid="draft">
@@ -333,7 +334,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
         onPointerUp={onPointerUp}
         onPickWall={(id) => {
           if (pickOpeningTool) {
-            const kind = tool as "door" | "window" | "passage";
+            const kind = tool as "door" | "window" | "passage" | "vent";
             let created = "";
             apply((p) => {
               const r = addOpening(p, id, lastPointerPlan.current ?? { x: 0, y: 0 }, kind);

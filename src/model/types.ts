@@ -60,7 +60,7 @@ export type Wall = {
   label: string;
 };
 
-export type OpeningKind = "door" | "window" | "passage";
+export type OpeningKind = "door" | "window" | "passage" | "vent";
 
 export type Opening = {
   id: OpeningId;

@@ -16,6 +16,7 @@ const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: "door", label: "Door", hint: "Click a wall (D)" },
   { id: "window", label: "Window", hint: "Click a wall (N)" },
   { id: "passage", label: "Opening", hint: "Archway or hatch (P)" },
+  { id: "vent", label: "Vent", hint: "Ventilation opening (E)" },
   { id: "room", label: "Room", hint: "Outline an area (R)" },
 ];
 

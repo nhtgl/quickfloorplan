@@ -37,6 +37,8 @@ const DEFAULTS: Record<OpeningKind, { width: number; height: number; sill: numbe
   door: { width: 900, height: 2050, sill: 0 },
   window: { width: 1200, height: 1400, sill: 900 },
   passage: { width: 1000, height: 2100, sill: 0 },
+  // A typical extract vent, high on the wall and clear of a 2050 door head.
+  vent: { width: 150, height: 150, sill: 2200 },
 };
 
 /** Place an opening at a measured distance along the wall, clamped to stay on it. */

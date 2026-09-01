@@ -13,6 +13,7 @@ const SHORTCUTS: Record<string, Tool> = {
   d: "door",
   n: "window",
   p: "passage",
+  e: "vent",
   r: "room",
 };
 

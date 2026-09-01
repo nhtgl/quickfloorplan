@@ -237,3 +237,40 @@ describe("wallDimensionChain", () => {
     expect(chain.reduce((n, c) => n + (c.end - c.start), 0)).toBe(4200);
   });
 });
+
+describe("ventilation openings", () => {
+  it("does not read as a hole in the plan, unlike every other kind", async () => {
+    const { cutsThePlan } = await import("./openings");
+    expect(cutsThePlan("vent")).toBe(false);
+    for (const kind of ["door", "window", "passage"] as const) {
+      expect(cutsThePlan(kind)).toBe(true);
+    }
+  });
+
+  it("goes in high on the wall by default, clear of a door head", async () => {
+    const { addOpeningAtOffset } = await import("./ops");
+    const p = wallProject();
+    const { project, id } = addOpeningAtOffset(p, p.walls[0].id, 2000, "vent");
+    const vent = project.openings.find((o) => o.id === id)!;
+    expect(vent).toMatchObject({ kind: "vent", width: 150, height: 150, sill: 2200 });
+  });
+
+  it("still gets dimensioned, so it can be set out on site", async () => {
+    const { addOpeningAtOffset } = await import("./ops");
+    const { wallDimensionChain } = await import("./openings");
+    const p = wallProject();
+    const { project } = addOpeningAtOffset(p, p.walls[0].id, 2000, "vent");
+    const chain = wallDimensionChain(project, project.walls[0].id, 0);
+    expect(chain.map((c) => c.kind)).toEqual(["solid", "opening", "solid"]);
+    expect(chain.reduce((n, c) => n + (c.end - c.start), 0)).toBe(4200);
+  });
+
+  it("is flagged when it reaches above the wall", async () => {
+    const { addOpeningAtOffset, updateOpening } = await import("./ops");
+    const { projectWarnings } = await import("./validate");
+    let p = wallProject();
+    const { project, id } = addOpeningAtOffset(p, p.walls[0].id, 2000, "vent");
+    p = updateOpening(project, id, { sill: 2550 });
+    expect(projectWarnings(p).map((w) => w.kind)).toContain("opening-too-tall");
+  });
+});

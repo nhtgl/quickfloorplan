@@ -1,7 +1,7 @@
 import { wallById, wallEnds, wallLength } from "./geometry";
 import { wallSpanForSide } from "./measure";
 import { viewSpan, wallOpeningViews } from "./sharedOpenings";
-import type { OpeningId, Point, Project } from "./types";
+import type { OpeningId, OpeningKind, Point, Project } from "./types";
 
 export function openingById(p: Project, id: OpeningId) {
   const o = p.openings.find((x) => x.id === id);
@@ -160,4 +160,15 @@ export function wallDimensionChain(
     out.push({ start: cursor, end: span.end, kind: "solid", openingIds: [] });
   }
   return out;
+}
+
+/**
+ * Whether an opening reads as a hole in the plan.
+ *
+ * A plan is a horizontal cut through the building about waist height. A ventilation
+ * opening is usually well above that, or down at the skirting, so it is not a gap in
+ * the wall at the height the plan is taken — it is marked on the wall instead.
+ */
+export function cutsThePlan(kind: OpeningKind): boolean {
+  return kind !== "vent";
 }

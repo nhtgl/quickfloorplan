@@ -351,3 +351,100 @@ describe("a mirrored elevation", () => {
     }
   });
 });
+
+describe("ventilation openings on the drawings", () => {
+  const withVent = () => {
+    const p = base();
+    p.openings = [
+      {
+        id: newId("o"),
+        wallId: p.walls[0].id,
+        kind: "vent",
+        offset: 2000,
+        width: 150,
+        height: 150,
+        sill: 2200,
+      },
+    ];
+    return p;
+  };
+
+  it("marks the wall on the plan rather than cutting through it", () => {
+    const { container } = render(<PlanSvg project={withVent()} width={800} height={600} />);
+    expect(container.querySelector('[data-testid="vent-mark"]')).toBeInTheDocument();
+  });
+
+  it("still cuts the wall for a window, so the two read differently", () => {
+    const p = base();
+    p.openings = [
+      {
+        id: newId("o"),
+        wallId: p.walls[0].id,
+        kind: "window",
+        offset: 2000,
+        width: 1200,
+        height: 1400,
+        sill: 900,
+      },
+    ];
+    const { container } = render(<PlanSvg project={p} width={800} height={600} />);
+    expect(container.querySelector('[data-testid="vent-mark"]')).toBeNull();
+    expect(container.querySelector('[data-testid="window-symbol"]')).toBeInTheDocument();
+  });
+
+  it("draws it hatched and named on the elevation", () => {
+    const p = withVent();
+    const { container, getByText } = render(
+      <ElevationSvg project={p} wallId={p.walls[0].id} width={800} height={500} />,
+    );
+    expect(container.querySelector('[data-testid="vent-hatch"]')).toBeInTheDocument();
+    expect(getByText("Vent")).toBeInTheDocument();
+  });
+
+  it("dimensions its height above the floor, which is the point of a vent", () => {
+    const p = withVent();
+    const { container } = render(
+      <ElevationSvg project={p} wallId={p.walls[0].id} width={800} height={500} />,
+    );
+    const labels = [...container.querySelectorAll('[data-testid="dim-label"]')].map(
+      (n) => n.textContent,
+    );
+    expect(labels).toContain("sill 220 cm");
+    expect(labels).toContain("15 cm");
+  });
+});
+
+describe("labelling an opening too small to write in", () => {
+  const openingOf = (kind: "vent" | "window", width: number, height: number) => {
+    const p = base();
+    p.openings = [
+      {
+        id: newId("o"),
+        wallId: p.walls[0].id,
+        kind,
+        offset: 2000,
+        width,
+        height,
+        sill: kind === "vent" ? 2200 : 900,
+      },
+    ];
+    return p;
+  };
+
+  const placement = (p: Project) => {
+    const { container } = render(
+      <ElevationSvg project={p} wallId={p.walls[0].id} width={800} height={500} />,
+    );
+    return container
+      .querySelector('[data-testid="opening-label"]')!
+      .getAttribute("data-placement");
+  };
+
+  it("writes the name inside an opening wide enough to hold it", () => {
+    expect(placement(openingOf("window", 1200, 1400))).toBe("inside");
+  });
+
+  it("writes it above a vent, which is too narrow for its own name", () => {
+    expect(placement(openingOf("vent", 150, 150))).toBe("above");
+  });
+});

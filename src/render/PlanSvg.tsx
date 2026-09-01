@@ -9,6 +9,7 @@ import {
 import { projectUnit } from "../model/factory";
 import { wallLengthForSide, wallSpanForSide } from "../model/measure";
 import {
+  cutsThePlan,
   doorSwingArc,
   labelOffsetAlongWall,
   openingPlanSegment,
@@ -207,7 +208,7 @@ export function PlanSvg(props: PlanSvgProps) {
           the opening the other wall already cut and the door would vanish. */}
       {p.walls.flatMap((w) =>
         wallOpeningViews(p, w.id)
-          .filter((view) => !view.own)
+          .filter((view) => !view.own && cutsThePlan(view.opening.kind))
           .map((view) => {
             const [start, end] = viewSpan(view);
             return (
@@ -232,7 +233,29 @@ export function PlanSvg(props: PlanSvgProps) {
         const colour = alert ? ALERT : selected ? ACCENT : WALL;
         return (
           <g key={o.id} data-testid="opening" data-opening-kind={o.kind}>
-            <polygon points={cutPoints(p, wall.id, cutStart, cutEnd)} fill={PAPER} />
+            {cutsThePlan(o.kind) ? (
+              <polygon points={cutPoints(p, wall.id, cutStart, cutEnd)} fill={PAPER} />
+            ) : (
+              // A vent sits above the height a plan is cut at, so the wall stays whole
+              // and the vent is marked on it instead of punched through it.
+              <g data-testid="vent-mark">
+                <polygon
+                  points={cutPoints(p, wall.id, cutStart, cutEnd)}
+                  fill="none"
+                  stroke={PAPER}
+                  strokeWidth={hairline * 1.5}
+                  strokeDasharray={`${5 * mmPerPx} ${4 * mmPerPx}`}
+                />
+                <circle
+                  cx={(seg.from.x + seg.to.x) / 2}
+                  cy={(seg.from.y + seg.to.y) / 2}
+                  r={Math.max(o.width, 5 * mmPerPx) / 2}
+                  fill="none"
+                  stroke={PAPER}
+                  strokeWidth={hairline * 1.5}
+                />
+              </g>
+            )}
             {o.kind === "window" && (
               <line
                 data-testid="window-symbol"

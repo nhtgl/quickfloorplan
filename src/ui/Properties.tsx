@@ -160,6 +160,7 @@ export function Properties() {
             <option value="door">Door</option>
             <option value="window">Window</option>
             <option value="passage">Opening / hatch</option>
+            <option value="vent">Ventilation</option>
           </select>
         </label>
         <NumberField
@@ -386,6 +387,7 @@ const KIND_NAME: Record<OpeningKind, string> = {
   door: "Door",
   window: "Window",
   passage: "Opening",
+  vent: "Vent",
 };
 
 /**
@@ -461,6 +463,7 @@ function OpeningList({ wallId, wallLabel }: { wallId: string; wallLabel: string 
         <button onClick={() => add("door")}>+ Door</button>
         <button onClick={() => add("window")}>+ Window</button>
         <button onClick={() => add("passage")}>+ Opening</button>
+        <button onClick={() => add("vent")}>+ Vent</button>
       </div>
     </section>
   );

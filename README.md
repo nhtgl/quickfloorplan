@@ -93,8 +93,14 @@ thickness of a wall you have already measured one room against would otherwise s
 room's face too. Each field is named after what lies on that side, so you set "the kitchen
 face", not "the left one". The same panel lists every door, window and opening in that wall with its
 position and size, so you can find and edit one without hunting for its symbol on the plan,
-and add or remove them from there. **Door**, **Window** and **Opening** also place a fitting
-on whichever wall you click. **Room** outlines an area.
+and add or remove them from there. **Door**, **Window**, **Opening** and **Vent** also place a fitting
+on whichever wall you click.
+
+A **vent** is a ventilation opening: an extract, an air brick, a trickle vent. It defaults to
+15 cm square, high on the wall and clear of a door head. It does not read as a hole in the
+plan the way a door does, because a plan is a cut through the building at about waist height
+and a vent is usually well above or below that — the wall stays whole and the vent is marked on
+it. It is dimensioned like everything else, since its position still has to be set out. **Room** outlines an area.
 
 **Room from sizes…** builds a whole room from numbers you type. Enter each wall and the turn
 after it — `250, 90, 100, 90, 250, 90, 100, 90` is a 250 wall, a quarter turn, a 100 wall, and
@@ -141,8 +147,8 @@ swings into the same room.
 Zoom and fit buttons sit at the bottom right of the canvas. The **Pan** tool drags the view,
 and shift-drag or middle-drag pans with any tool selected.
 
-Keys: `V` select, `H` pan, `W` wall, `D` door, `N` window, `P` opening, `R` room, `F` fit to
-view, `Backspace` take back a corner, `Cmd/Ctrl+Z` undo. The wheel zooms.
+Keys: `V` select, `H` pan, `W` wall, `D` door, `N` window, `P` opening, `E` vent, `R` room,
+`F` fit to view, `Backspace` take back a corner, `Cmd/Ctrl+Z` undo. The wheel zooms.
 
 Projects are `.floorplan.json` files on your disk. The app also autosaves to the browser so
 a refresh never loses work, but the file is the thing you own and share.
